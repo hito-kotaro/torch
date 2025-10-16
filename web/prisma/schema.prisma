@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 案件情報（メール1件 = Job 1レコード）
+model Job {
+  id          String   @id @default(cuid())
+
+  // AI抽出された情報（公開用）
+  title       String   // 公開用タイトル
+  company     String?  // 企業名
+  position    String?  // ポジション（フロントエンドエンジニア、バックエンドエンジニア等）
+  location    String?  // 勤務地
+  unitPrice   Int?     // 単価（月額、単位：円）
+  summary     String?  @db.Text // 案件概要
+  description String?  @db.Text // 詳細説明
+
+  // メール原文
+  originalTitle   String  // 元のメールタイトル（件名）
+  originalBody    String  @db.Text // 元のメール本文
+  senderEmail     String  // 送信者メールアドレス
+  receivedAt      DateTime // メール受信日時
+
+  // スキルタグ（多対多）
+  skills      JobSkill[]
+
+  // メタ情報
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([receivedAt])
+  @@index([position])
+  @@index([company])
+  @@index([unitPrice])
+}
+
+// スキルマスタ
+model Skill {
+  id        String     @id @default(cuid())
+  name      String     @unique // React, Go, TypeScript等
+  category  String?    // frontend, backend, infrastructure等
+  jobs      JobSkill[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+// 案件とスキルの中間テーブル
+model JobSkill {
+  id      String @id @default(cuid())
+  job     Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId   String
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skillId String
+
+  @@unique([jobId, skillId])
+  @@index([jobId])
+  @@index([skillId])
+}

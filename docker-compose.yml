@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: torch-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: torch
+      POSTGRES_PASSWORD: torch
+      POSTGRES_DB: torch
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U torch"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: base
+    container_name: torch-web
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://torch:torch@db:5432/torch?schema=public
+    command: sh -c "cd /app && pnpm install && pnpm dev"
+    depends_on:
+      db:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
