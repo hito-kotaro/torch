@@ -23,6 +23,7 @@ export default function SearchBar({ onSearch, onSkillFilter, onGradeFilter, avai
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -76,8 +77,18 @@ export default function SearchBar({ onSearch, onSkillFilter, onGradeFilter, avai
         </div>
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">スキルで絞り込み</p>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-gray-700">
+            スキルで絞り込み ({availableSkills.length}件)
+          </p>
+          <button
+            onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
+            className="text-xs text-blue-600 hover:text-blue-800"
+          >
+            {isSkillsExpanded ? '折りたたむ ▲' : '展開する ▼'}
+          </button>
+        </div>
+        <div className={`flex gap-2 flex-wrap transition-all ${isSkillsExpanded ? 'max-h-[500px] overflow-y-auto' : 'max-h-[120px] overflow-hidden'}`}>
           {availableSkills.map((skill) => (
             <button
               key={skill}
