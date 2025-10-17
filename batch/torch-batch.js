@@ -3,19 +3,19 @@
 // ===============================================================
 
 // スクリプトプロパティから取得
-const GEMINI_API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-const TORCH_API_URL = PropertiesService.getScriptProperties().getProperty('TORCH_API_URL');
-const TORCH_API_KEY = PropertiesService.getScriptProperties().getProperty('TORCH_API_KEY');
+var GEMINI_API_KEY_TORCH = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+var TORCH_API_URL_CONFIG = PropertiesService.getScriptProperties().getProperty('TORCH_API_URL');
+var TORCH_API_KEY_CONFIG = PropertiesService.getScriptProperties().getProperty('TORCH_API_KEY');
 
 // 設定
-const TARGET_EMAIL_ADDRESS = "eigyo@luxy-inc.com";
-const MAX_THREADS_PER_EXECUTION = 100;
+var TARGET_EMAIL_TORCH = "eigyo@luxy-inc.com";
+var MAX_THREADS_TORCH = 100;
 
 /**
  * メール自動処理トリガー（5分ごとに実行）
  */
 function processEmailsTrigger() {
-  if (!GEMINI_API_KEY || !TORCH_API_URL || !TORCH_API_KEY) {
+  if (!GEMINI_API_KEY_TORCH || !TORCH_API_URL_CONFIG || !TORCH_API_KEY_CONFIG) {
     console.error("必要な環境変数が設定されていません。");
     return;
   }
@@ -24,10 +24,10 @@ function processEmailsTrigger() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const formattedDate = Utilities.formatDate(yesterday, "JST", "yyyy/MM/dd");
-  const query = `to:${TARGET_EMAIL_ADDRESS} is:unread after:${formattedDate}`;
+  const query = `to:${TARGET_EMAIL_TORCH} is:unread after:${formattedDate}`;
 
   try {
-    const threads = GmailApp.search(query, 0, MAX_THREADS_PER_EXECUTION);
+    const threads = GmailApp.search(query, 0, MAX_THREADS_TORCH);
     if (threads.length === 0) {
       console.log("処理対象の未読メールはありませんでした。");
       return;
@@ -203,7 +203,7 @@ ${mailBody}
  * Gemini APIを呼び出す
  */
 function callGeminiAPI(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY_TORCH}`;
 
   const payload = {
     contents: [{
@@ -245,13 +245,13 @@ function callGeminiAPI(prompt) {
  * Torch APIに案件情報を送信
  */
 function sendToTorchAPI(jobData) {
-  const url = `${TORCH_API_URL}/api/jobs/import`;
+  const url = `${TORCH_API_URL_CONFIG}/api/jobs/import`;
 
   const options = {
     method: 'post',
     contentType: 'application/json',
     headers: {
-      'X-API-Key': TORCH_API_KEY
+      'X-API-Key': TORCH_API_KEY_CONFIG
     },
     payload: JSON.stringify(jobData),
     muteHttpExceptions: true

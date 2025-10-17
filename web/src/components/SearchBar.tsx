@@ -6,22 +6,8 @@ type SearchBarProps = {
   onSearch: (query: string) => void;
   onSkillFilter: (skills: string[]) => void;
   onGradeFilter: (grades: string[]) => void;
+  availableSkills: string[];
 };
-
-const availableSkills = [
-  'React',
-  'TypeScript',
-  'Next.js',
-  'Go',
-  'PostgreSQL',
-  'Docker',
-  'Node.js',
-  'AWS',
-  'Python',
-  'Django',
-  'Vue.js',
-  'Nuxt.js',
-];
 
 const availableGrades = [
   { value: 'S1', label: 'S1:サポート前提' },
@@ -33,7 +19,7 @@ const availableGrades = [
   { value: 'MG', label: 'MG:マネージャー' },
 ];
 
-export default function SearchBar({ onSearch, onSkillFilter, onGradeFilter }: SearchBarProps) {
+export default function SearchBar({ onSearch, onSkillFilter, onGradeFilter, availableSkills }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);

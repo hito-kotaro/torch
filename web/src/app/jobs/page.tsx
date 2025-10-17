@@ -33,10 +33,20 @@ async function getJobs(isAdmin: boolean) {
   }));
 }
 
+async function getAllSkills() {
+  const skills = await prisma.skill.findMany({
+    orderBy: {
+      name: 'asc',
+    },
+  });
+  return skills.map((skill) => skill.name);
+}
+
 export default async function JobsPage() {
   const userRole = await getUserRole();
   const isAdmin = userRole === 'admin';
   const jobs = await getJobs(isAdmin);
+  const availableSkills = await getAllSkills();
 
-  return <JobsClient jobs={jobs} userRole={userRole} />;
+  return <JobsClient jobs={jobs} userRole={userRole} availableSkills={availableSkills} />;
 }

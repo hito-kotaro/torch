@@ -25,18 +25,22 @@ type Job = {
 type JobsClientProps = {
   jobs: Job[];
   userRole: 'admin' | 'general';
+  availableSkills: string[];
 };
 
-export default function JobsClient({ jobs, userRole }: JobsClientProps) {
+export default function JobsClient({ jobs, userRole, availableSkills }: JobsClientProps) {
   const [selectedJob, setSelectedJob] = useState(jobs[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [skillFilters, setSkillFilters] = useState<string[]>([]);
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
 
   const isAdmin = userRole === 'admin';
 
-  const filteredJobs = useMemo(() => {
-    return jobs.filter((job) => {
+  const filteredAndSortedJobs = useMemo(() => {
+    let result = jobs.filter((job) => {
       const matchesSearch =
         searchQuery === '' ||
         job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -53,7 +57,28 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
 
       return matchesSearch && matchesSkills && matchesGrade;
     });
-  }, [jobs, searchQuery, skillFilters, gradeFilters]);
+
+    // ソート処理
+    result.sort((a, b) => {
+      const dateA = new Date(a.receivedAt).getTime();
+      const dateB = new Date(b.receivedAt).getTime();
+      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [jobs, searchQuery, skillFilters, gradeFilters, sortOrder]);
+
+  // ページネーション
+  const totalPages = Math.ceil(filteredAndSortedJobs.length / ITEMS_PER_PAGE);
+  const paginatedJobs = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredAndSortedJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredAndSortedJobs, currentPage]);
+
+  // フィルタ変更時にページを1にリセット
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+  };
 
   return (
     <div className="h-screen flex flex-col">
@@ -64,15 +89,40 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
           left={
             <div className="flex flex-col h-full">
               <div className="sticky top-0 bg-white z-10 p-6 pb-4 border-b border-gray-200">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">案件一覧</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900">案件一覧</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">
+                      {filteredAndSortedJobs.length}件
+                    </span>
+                    <select
+                      value={sortOrder}
+                      onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="desc">新しい順</option>
+                      <option value="asc">古い順</option>
+                    </select>
+                  </div>
+                </div>
                 <SearchBar
-                  onSearch={setSearchQuery}
-                  onSkillFilter={setSkillFilters}
-                  onGradeFilter={setGradeFilters}
+                  onSearch={(query) => {
+                    setSearchQuery(query);
+                    handleFilterChange();
+                  }}
+                  onSkillFilter={(skills) => {
+                    setSkillFilters(skills);
+                    handleFilterChange();
+                  }}
+                  onGradeFilter={(grades) => {
+                    setGradeFilters(grades);
+                    handleFilterChange();
+                  }}
+                  availableSkills={availableSkills}
                 />
               </div>
               <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-3">
-                {filteredJobs.map((job) => (
+                {paginatedJobs.map((job) => (
                   <div
                     key={job.id}
                     onClick={() => setSelectedJob(job)}
@@ -102,6 +152,27 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     </div>
                   </div>
                 ))}
+                {totalPages > 1 && (
+                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      前へ
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      {currentPage} / {totalPages} ページ
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      次へ
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           }
