@@ -38,7 +38,7 @@ async function main() {
     {
       title: 'React/TypeScript フロントエンドエンジニア',
       company: 'A株式会社',
-      position: 'フロントエンドエンジニア',
+      grade: 'S3',
       location: '東京都渋谷区',
       unitPrice: 800000,
       summary: '大規模Webアプリケーションのフロントエンド開発',
@@ -52,7 +52,7 @@ async function main() {
     {
       title: 'バックエンドエンジニア（Go）',
       company: 'B株式会社',
-      position: 'バックエンドエンジニア',
+      grade: 'S4',
       location: '東京都港区',
       unitPrice: 900000,
       summary: 'マイクロサービスアーキテクチャでのバックエンド開発',
@@ -66,7 +66,7 @@ async function main() {
     {
       title: 'フルスタックエンジニア',
       company: 'C株式会社',
-      position: 'フルスタックエンジニア',
+      grade: 'S2',
       location: '大阪府大阪市',
       unitPrice: 750000,
       summary: '新規サービス立ち上げのフルスタック開発',
@@ -80,7 +80,7 @@ async function main() {
     {
       title: 'Pythonバックエンドエンジニア',
       company: 'D株式会社',
-      position: 'バックエンドエンジニア',
+      grade: 'S3',
       location: '東京都新宿区',
       unitPrice: 700000,
       summary: 'Django を用いたAPI開発・保守',
@@ -94,7 +94,7 @@ async function main() {
     {
       title: 'Vue.js フロントエンドエンジニア',
       company: 'E株式会社',
-      position: 'フロントエンドエンジニア',
+      grade: 'S5',
       location: '東京都品川区',
       unitPrice: 820000,
       summary: 'Vue.js/Nuxt.jsでのSPA開発',
@@ -108,7 +108,7 @@ async function main() {
     {
       title: 'インフラエンジニア（AWS/Kubernetes）',
       company: 'F株式会社',
-      position: 'インフラエンジニア',
+      grade: 'SS',
       location: '東京都千代田区',
       unitPrice: 950000,
       summary: 'AWSとKubernetesを使用したインフラ構築・運用',

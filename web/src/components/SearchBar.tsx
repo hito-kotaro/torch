@@ -5,7 +5,7 @@ import { useState } from 'react';
 type SearchBarProps = {
   onSearch: (query: string) => void;
   onSkillFilter: (skills: string[]) => void;
-  onPositionFilter: (positions: string[]) => void;
+  onGradeFilter: (grades: string[]) => void;
 };
 
 const availableSkills = [
@@ -23,16 +23,20 @@ const availableSkills = [
   'Nuxt.js',
 ];
 
-const availablePositions = [
-  'フロントエンドエンジニア',
-  'バックエンドエンジニア',
-  'フルスタックエンジニア',
+const availableGrades = [
+  { value: 'S1', label: 'S1:サポート前提' },
+  { value: 'S2', label: 'S2:単独作業' },
+  { value: 'S3', label: 'S3:メンター' },
+  { value: 'S4', label: 'S4:主力' },
+  { value: 'S5', label: 'S5:リーダー' },
+  { value: 'SS', label: 'SS:テックリード' },
+  { value: 'MG', label: 'MG:マネージャー' },
 ];
 
-export default function SearchBar({ onSearch, onSkillFilter, onPositionFilter }: SearchBarProps) {
+export default function SearchBar({ onSearch, onSkillFilter, onGradeFilter }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -48,12 +52,12 @@ export default function SearchBar({ onSearch, onSkillFilter, onPositionFilter }:
     onSkillFilter(newSkills);
   };
 
-  const togglePosition = (position: string) => {
-    const newPositions = selectedPositions.includes(position)
-      ? selectedPositions.filter((p) => p !== position)
-      : [...selectedPositions, position];
-    setSelectedPositions(newPositions);
-    onPositionFilter(newPositions);
+  const toggleGrade = (grade: string) => {
+    const newGrades = selectedGrades.includes(grade)
+      ? selectedGrades.filter((g) => g !== grade)
+      : [...selectedGrades, grade];
+    setSelectedGrades(newGrades);
+    onGradeFilter(newGrades);
   };
 
   return (
@@ -68,19 +72,19 @@ export default function SearchBar({ onSearch, onSkillFilter, onPositionFilter }:
         />
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">ポジションで絞り込み</p>
+        <p className="text-sm font-medium text-gray-700 mb-2">グレードで絞り込み</p>
         <div className="flex gap-2 flex-wrap">
-          {availablePositions.map((position) => (
+          {availableGrades.map((grade) => (
             <button
-              key={position}
-              onClick={() => togglePosition(position)}
+              key={grade.value}
+              onClick={() => toggleGrade(grade.value)}
               className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                selectedPositions.includes(position)
+                selectedGrades.includes(grade.value)
                   ? 'bg-green-500 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
-              {position}
+              {grade.label}
             </button>
           ))}
         </div>

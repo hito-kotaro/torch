@@ -11,22 +11,29 @@ type Job = {
   title: string;
   company: string | null;
   location: string | null;
-  position: string | null;
+  grade: string | null;
   unitPrice: number | null;
   summary: string | null;
   description: string | null;
+  originalTitle: string | null;
+  originalBody: string | null;
+  senderEmail: string | null;
+  receivedAt: Date;
   skills: string[];
 };
 
 type JobsClientProps = {
   jobs: Job[];
+  userRole: 'admin' | 'general';
 };
 
-export default function JobsClient({ jobs }: JobsClientProps) {
+export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const [selectedJob, setSelectedJob] = useState(jobs[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [skillFilters, setSkillFilters] = useState<string[]>([]);
-  const [positionFilters, setPositionFilters] = useState<string[]>([]);
+  const [gradeFilters, setGradeFilters] = useState<string[]>([]);
+
+  const isAdmin = userRole === 'admin';
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -40,19 +47,19 @@ export default function JobsClient({ jobs }: JobsClientProps) {
         skillFilters.length === 0 ||
         skillFilters.every((skill) => job.skills.includes(skill));
 
-      const matchesPosition =
-        positionFilters.length === 0 ||
-        (job.position && positionFilters.includes(job.position));
+      const matchesGrade =
+        gradeFilters.length === 0 ||
+        (job.grade && gradeFilters.includes(job.grade));
 
-      return matchesSearch && matchesSkills && matchesPosition;
+      return matchesSearch && matchesSkills && matchesGrade;
     });
-  }, [jobs, searchQuery, skillFilters, positionFilters]);
+  }, [jobs, searchQuery, skillFilters, gradeFilters]);
 
   return (
     <div className="h-screen flex flex-col">
       <Header />
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar />
+        <Sidebar isAdmin={isAdmin} />
         <SplitLayout
           left={
             <div className="flex flex-col h-full">
@@ -61,7 +68,7 @@ export default function JobsClient({ jobs }: JobsClientProps) {
                 <SearchBar
                   onSearch={setSearchQuery}
                   onSkillFilter={setSkillFilters}
-                  onPositionFilter={setPositionFilters}
+                  onGradeFilter={setGradeFilters}
                 />
               </div>
               <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-3">
@@ -78,7 +85,7 @@ export default function JobsClient({ jobs }: JobsClientProps) {
                     <h3 className="font-semibold text-gray-900">{job.title}</h3>
                     <p className="text-sm text-gray-600 mt-1">{job.company}</p>
                     <p className="text-sm text-gray-500 mt-1">{job.location}</p>
-                    {job.unitPrice && (
+                    {isAdmin && job.unitPrice && (
                       <p className="text-sm font-semibold text-green-600 mt-1">
                         ¥{job.unitPrice.toLocaleString()}/月
                       </p>
@@ -99,7 +106,7 @@ export default function JobsClient({ jobs }: JobsClientProps) {
             </div>
           }
           right={
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">案件詳細</h2>
               {selectedJob && (
                 <div className="space-y-4">
@@ -109,7 +116,7 @@ export default function JobsClient({ jobs }: JobsClientProps) {
                     </h3>
                     <p className="text-gray-600 mt-2">{selectedJob.company}</p>
                     <p className="text-gray-500 mt-1">{selectedJob.location}</p>
-                    {selectedJob.unitPrice && (
+                    {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">
                         ¥{selectedJob.unitPrice.toLocaleString()}/月
                       </p>
@@ -139,6 +146,35 @@ export default function JobsClient({ jobs }: JobsClientProps) {
                         {selectedJob.description}
                       </p>
                     </div>
+                  )}
+                  {isAdmin && (
+                    <>
+                      <div className="border-t pt-4 mt-6">
+                        <h4 className="font-semibold text-red-700 mb-2">
+                          【管理者専用情報】
+                        </h4>
+                      </div>
+                      {selectedJob.originalTitle && (
+                        <div>
+                          <h4 className="font-semibold text-gray-900">元のメール件名</h4>
+                          <p className="text-gray-700 mt-2">{selectedJob.originalTitle}</p>
+                        </div>
+                      )}
+                      {selectedJob.senderEmail && (
+                        <div>
+                          <h4 className="font-semibold text-gray-900">送信者</h4>
+                          <p className="text-gray-700 mt-2">{selectedJob.senderEmail}</p>
+                        </div>
+                      )}
+                      {selectedJob.originalBody && (
+                        <div>
+                          <h4 className="font-semibold text-gray-900">元のメール本文</h4>
+                          <p className="text-gray-700 mt-2 whitespace-pre-wrap bg-gray-50 p-4 rounded border border-gray-200">
+                            {selectedJob.originalBody}
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

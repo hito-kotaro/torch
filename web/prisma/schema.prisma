@@ -17,7 +17,7 @@ model Job {
   // AI抽出された情報（公開用）
   title       String   // 公開用タイトル
   company     String?  // 企業名
-  position    String?  // ポジション（フロントエンドエンジニア、バックエンドエンジニア等）
+  grade       String?  // グレード（S1, S2, S3, S4, S5, SS, MG）
   location    String?  // 勤務地
   unitPrice   Int?     // 単価（月額、単位：円）
   summary     String?  @db.Text // 案件概要
@@ -37,7 +37,7 @@ model Job {
   updatedAt   DateTime @updatedAt
 
   @@index([receivedAt])
-  @@index([position])
+  @@index([grade])
   @@index([company])
   @@index([unitPrice])
 }
