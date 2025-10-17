@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
 import { isAdmin } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import RegisterClient from './RegisterClient';
 
 export default async function RegisterPage() {
