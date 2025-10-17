@@ -35,6 +35,7 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
+  const [isSkillsExpanded, setIsSkillsExpanded] = useState(false); // スキル折りたたみ状態
   const ITEMS_PER_PAGE = 50;
 
   const isAdmin = userRole === 'admin';
@@ -194,17 +195,45 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
                     )}
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900">必要スキル</h4>
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      {selectedJob.skills.map((skill) => (
-                        <span
-                          key={skill}
-                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-gray-900">
+                        必要スキル ({selectedJob.skills.length}件)
+                      </h4>
+                      <button
+                        onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        {isSkillsExpanded ? '折りたたむ ▲' : '展開する ▼'}
+                      </button>
                     </div>
+                    {isSkillsExpanded ? (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {selectedJob.skills.map((skill) => (
+                          <span
+                            key={skill}
+                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {selectedJob.skills.slice(0, 5).map((skill) => (
+                          <span
+                            key={skill}
+                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                        {selectedJob.skills.length > 5 && (
+                          <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
+                            +{selectedJob.skills.length - 5}件
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">概要</h4>
