@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import SplitLayout from '@/components/SplitLayout';
@@ -34,8 +34,16 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
+  const jobListRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userRole === 'admin';
+
+  // ページ変更時にスクロールを一番上に戻す
+  useEffect(() => {
+    if (jobListRef.current) {
+      jobListRef.current.scrollTop = 0;
+    }
+  }, [currentPage]);
 
   const filteredAndSortedJobs = useMemo(() => {
     const result = jobs.filter((job) => {
@@ -110,7 +118,7 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                   }}
                 />
               </div>
-              <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-3">
+              <div ref={jobListRef} className="flex-1 overflow-y-auto p-6 pt-4 space-y-3">
                 {paginatedJobs.map((job) => (
                   <div
                     key={job.id}
