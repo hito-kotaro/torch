@@ -40,7 +40,7 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
   const isAdmin = userRole === 'admin';
 
   const filteredAndSortedJobs = useMemo(() => {
-    let result = jobs.filter((job) => {
+    const result = jobs.filter((job) => {
       const matchesSearch =
         searchQuery === '' ||
         job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
