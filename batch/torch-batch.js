@@ -178,8 +178,14 @@ ${mailBody}
 - **summary**: 案件概要（200字以内で要約）
 - **description**: 詳細説明（業務内容、開発環境など）
 - **skills**: 必要なスキルの配列（例: ["React", "TypeScript", "AWS"]）
-  - 技術名を正確に抽出してください
-  - React.js → React、Vue.js → Vue のように正規化してください
+  - 技術名を正確に抽出し、以下の表記ルールに従って正規化してください
+  - 大文字小文字: .NET, JavaScript, TypeScript, MySQL, PostgreSQL, GitHub, Git, Linux
+  - スラッシュ表記: CI/CD, HTML/CSS, PL/SQL
+  - スペース表記: React Native, Spring Boot, AWS Lambda, AWS S3, SQL Server
+  - ハイフン表記: Intra-mart
+  - フレームワーク略記: React（React.jsではなく）, Vue（Vue.jsではなく）, Next.js, Nest.js
+  - 製品名: VMware, Windows Server, Microsoft 365, Power BI, Oracle DB
+  - その他の統一表記: Palo Alto, Entra ID, Kubernetes（K8sではなく）, SageMaker
 
 【出力形式】
 必ず以下のJSON形式で、\`\`\`json ... \`\`\` のブロックで返却してください。

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { normalizeSkillNames } from '@/lib/normalizeSkill';
 
 type ImportJobRequest = {
   title: string;
@@ -56,7 +57,10 @@ export async function POST(request: NextRequest) {
 
     // スキルを関連付け
     if (body.skills && body.skills.length > 0) {
-      for (const skillName of body.skills) {
+      // スキル名を正規化（重複排除含む）
+      const normalizedSkills = normalizeSkillNames(body.skills);
+
+      for (const skillName of normalizedSkills) {
         // スキルを取得または作成
         let skill = await prisma.skill.findUnique({
           where: { name: skillName },
@@ -68,13 +72,24 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // JobSkillを作成
-        await prisma.jobSkill.create({
-          data: {
-            jobId: job.id,
-            skillId: skill.id,
-          },
+        // JobSkillを作成（重複チェック）
+        const existing = await prisma.jobSkill.findUnique({
+          where: {
+            jobId_skillId: {
+              jobId: job.id,
+              skillId: skill.id,
+            }
+          }
         });
+
+        if (!existing) {
+          await prisma.jobSkill.create({
+            data: {
+              jobId: job.id,
+              skillId: skill.id,
+            },
+          });
+        }
       }
     }
 

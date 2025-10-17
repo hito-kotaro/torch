@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { isAdmin } from '@/lib/auth';
+import { normalizeSkillNames } from '@/lib/normalizeSkill';
 
 export async function createJob(formData: FormData) {
   // 管理者チェック
@@ -31,8 +32,9 @@ export async function createJob(formData: FormData) {
   // 受信日時の変換
   const receivedAt = new Date(receivedAtStr);
 
-  // スキルの配列化
-  const skillNames = skillsStr ? skillsStr.split(',').filter((s) => s.trim()) : [];
+  // スキルの配列化と正規化
+  const rawSkills = skillsStr ? skillsStr.split(',').map((s) => s.trim()).filter((s) => s) : [];
+  const skillNames = normalizeSkillNames(rawSkills);
 
   // Jobを作成
   const job = await prisma.job.create({
@@ -64,13 +66,24 @@ export async function createJob(formData: FormData) {
       });
     }
 
-    // JobSkillを作成
-    await prisma.jobSkill.create({
-      data: {
-        jobId: job.id,
-        skillId: skill.id,
-      },
+    // JobSkillを作成（重複チェック）
+    const existing = await prisma.jobSkill.findUnique({
+      where: {
+        jobId_skillId: {
+          jobId: job.id,
+          skillId: skill.id,
+        }
+      }
     });
+
+    if (!existing) {
+      await prisma.jobSkill.create({
+        data: {
+          jobId: job.id,
+          skillId: skill.id,
+        },
+      });
+    }
   }
 
   // 案件一覧ページのキャッシュを再検証
