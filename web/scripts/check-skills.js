@@ -1,12 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: 'postgresql://neondb_owner:npg_tWK5ONpm4AEz@ep-late-sound-adt8mpjz-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require'
-    }
-  }
-});
+// 環境変数からDATABASE_URLを取得（デフォルトはローカル）
+const prisma = new PrismaClient();
 
 async function main() {
   const skills = await prisma.skill.findMany({
