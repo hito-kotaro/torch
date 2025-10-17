@@ -34,7 +34,7 @@ services:
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://torch:torch@db:5432/torch?schema=public
-    command: sh -c "cd /app && pnpm install && pnpm dev"
+    command: sh -c "cd /app && pnpm install && pnpm prisma generate && pnpm dev"
     depends_on:
       db:
         condition: service_healthy
