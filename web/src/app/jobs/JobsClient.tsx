@@ -25,17 +25,14 @@ type Job = {
 type JobsClientProps = {
   jobs: Job[];
   userRole: 'admin' | 'general';
-  availableSkills: string[];
 };
 
-export default function JobsClient({ jobs, userRole, availableSkills }: JobsClientProps) {
+export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const [selectedJob, setSelectedJob] = useState(jobs[0]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [skillFilters, setSkillFilters] = useState<string[]>([]);
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
-  const [isSkillsExpanded, setIsSkillsExpanded] = useState(false); // スキル折りたたみ状態
   const ITEMS_PER_PAGE = 50;
 
   const isAdmin = userRole === 'admin';
@@ -48,15 +45,11 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
         job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.summary?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesSkills =
-        skillFilters.length === 0 ||
-        skillFilters.every((skill) => job.skills.includes(skill));
-
       const matchesGrade =
         gradeFilters.length === 0 ||
         (job.grade && gradeFilters.includes(job.grade));
 
-      return matchesSearch && matchesSkills && matchesGrade;
+      return matchesSearch && matchesGrade;
     });
 
     // ソート処理
@@ -67,7 +60,7 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
     });
 
     return result;
-  }, [jobs, searchQuery, skillFilters, gradeFilters, sortOrder]);
+  }, [jobs, searchQuery, gradeFilters, sortOrder]);
 
   // ページネーション
   const totalPages = Math.ceil(filteredAndSortedJobs.length / ITEMS_PER_PAGE);
@@ -111,15 +104,10 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
                     setSearchQuery(query);
                     handleFilterChange();
                   }}
-                  onSkillFilter={(skills) => {
-                    setSkillFilters(skills);
-                    handleFilterChange();
-                  }}
                   onGradeFilter={(grades) => {
                     setGradeFilters(grades);
                     handleFilterChange();
                   }}
-                  availableSkills={availableSkills}
                 />
               </div>
               <div className="flex-1 overflow-y-auto p-6 pt-4 space-y-3">
@@ -138,7 +126,7 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
                     <p className="text-sm text-gray-500 mt-1">{job.location}</p>
                     {isAdmin && job.unitPrice && (
                       <p className="text-sm font-semibold text-green-600 mt-1">
-                        ¥{job.unitPrice.toLocaleString()}/月
+                        {job.unitPrice}万円/月
                       </p>
                     )}
                     <div className="flex gap-2 mt-2 flex-wrap">
@@ -190,50 +178,24 @@ export default function JobsClient({ jobs, userRole, availableSkills }: JobsClie
                     <p className="text-gray-500 mt-1">{selectedJob.location}</p>
                     {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">
-                        ¥{selectedJob.unitPrice.toLocaleString()}/月
+                        {selectedJob.unitPrice}万円/月
                       </p>
                     )}
                   </div>
                   <div>
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-gray-900">
-                        必要スキル ({selectedJob.skills.length}件)
-                      </h4>
-                      <button
-                        onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
-                        className="text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        {isSkillsExpanded ? '折りたたむ ▲' : '展開する ▼'}
-                      </button>
+                    <h4 className="font-semibold text-gray-900">
+                      必要スキル ({selectedJob.skills.length}件)
+                    </h4>
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      {selectedJob.skills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
+                        >
+                          {skill}
+                        </span>
+                      ))}
                     </div>
-                    {isSkillsExpanded ? (
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        {selectedJob.skills.map((skill) => (
-                          <span
-                            key={skill}
-                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        {selectedJob.skills.slice(0, 5).map((skill) => (
-                          <span
-                            key={skill}
-                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                        {selectedJob.skills.length > 5 && (
-                          <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
-                            +{selectedJob.skills.length - 5}件
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">概要</h4>

@@ -46,7 +46,6 @@ export default async function JobsPage() {
   const userRole = await getUserRole();
   const isAdmin = userRole === 'admin';
   const jobs = await getJobs(isAdmin);
-  const availableSkills = await getAllSkills();
 
-  return <JobsClient jobs={jobs} userRole={userRole} availableSkills={availableSkills} />;
+  return <JobsClient jobs={jobs} userRole={userRole} />;
 }
