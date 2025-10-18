@@ -214,6 +214,12 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                       <p className="text-gray-600 mt-2">{selectedJob.company}</p>
                     )}
                     <p className="text-gray-500 mt-1">{selectedJob.location}</p>
+                    {selectedJob.grade && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        ポジション: {selectedJob.grade}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">ID: {selectedJob.id}</p>
                     {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">
                         {selectedJob.unitPrice}万円/月

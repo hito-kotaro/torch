@@ -77,6 +77,12 @@ export default function JobDetailModal({
                 <p className="text-gray-600 mt-2">{job.company}</p>
               )}
               <p className="text-gray-500 mt-1">{job.location}</p>
+              {job.grade && (
+                <p className="text-sm text-gray-600 mt-1">
+                  ポジション: {job.grade}
+                </p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">ID: {job.id}</p>
               {isAdmin && job.unitPrice && (
                 <p className="text-lg font-semibold text-green-600 mt-2">
                   {job.unitPrice}万円/月
