@@ -130,7 +130,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     }`}
                   >
                     <h3 className="font-semibold text-gray-900">{job.title}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{job.company}</p>
+                    {isAdmin && job.company && (
+                      <p className="text-sm text-gray-600 mt-1">{job.company}</p>
+                    )}
                     <p className="text-sm text-gray-500 mt-1">{job.location}</p>
                     {isAdmin && job.unitPrice && (
                       <p className="text-sm font-semibold text-green-600 mt-1">
@@ -182,7 +184,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     <h3 className="text-xl font-semibold text-gray-900">
                       {selectedJob.title}
                     </h3>
-                    <p className="text-gray-600 mt-2">{selectedJob.company}</p>
+                    {isAdmin && selectedJob.company && (
+                      <p className="text-gray-600 mt-2">{selectedJob.company}</p>
+                    )}
                     <p className="text-gray-500 mt-1">{selectedJob.location}</p>
                     {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">
