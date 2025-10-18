@@ -149,28 +149,28 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     </div>
                   </div>
                 ))}
-                {totalPages > 1 && (
-                  <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                      前へ
-                    </button>
-                    <span className="text-sm text-gray-600">
-                      {currentPage} / {totalPages} ページ
-                    </span>
-                    <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-                    >
-                      次へ
-                    </button>
-                  </div>
-                )}
               </div>
+              {totalPages > 1 && (
+                <div className="bg-white border-t border-gray-200 p-4 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    前へ
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    {currentPage} / {totalPages} ページ
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  >
+                    次へ
+                  </button>
+                </div>
+              )}
             </div>
           }
           right={
