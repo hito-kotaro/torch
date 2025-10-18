@@ -1,0 +1,11 @@
+{
+  "name": "テスト太郎",
+  "age": 30,
+  "position": "SE",
+  "summary": "テスト人材です",
+  "originalTitle": "テスト件名",
+  "originalBody": "テスト本文",
+  "senderEmail": "test@example.com",
+  "receivedAt": "2025-10-18T00:00:00Z",
+  "skills": ["React"]
+}
