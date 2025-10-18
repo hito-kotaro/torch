@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { normalizeSkillNames } from '@/lib/normalizeSkill';
 
-const prisma = new PrismaClient();
+// Prismaクライアントのシングルトンインスタンス
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 // APIキーの検証
 const API_KEY = process.env.TORCH_API_KEY;
