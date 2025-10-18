@@ -45,7 +45,7 @@ export default function SearchBar({ onSearch, onGradeFilter }: SearchBarProps) {
         />
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">グレードで絞り込み</p>
+        <p className="text-sm font-medium text-gray-700 mb-2">ポジションで絞り込み</p>
         <div className="flex gap-2 flex-wrap">
           {availableGrades.map((grade) => (
             <button

@@ -99,10 +99,10 @@ export default function RegisterClient() {
                 />
               </div>
 
-              {/* グレード */}
+              {/* ポジション */}
               <div>
                 <label htmlFor="grade" className="block text-sm font-medium text-gray-700 mb-2">
-                  グレード
+                  ポジション
                 </label>
                 <select
                   id="grade"
