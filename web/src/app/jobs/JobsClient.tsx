@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import SplitLayout from '@/components/SplitLayout';
 import SearchBar from '@/components/SearchBar';
+import JobDetailModal from '@/components/JobDetailModal';
 
 type Job = {
   id: string;
@@ -33,6 +34,8 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false); // モーダル表示状態
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバー開閉状態
   const ITEMS_PER_PAGE = 50;
   const jobListRef = useRef<HTMLDivElement>(null);
 
@@ -44,6 +47,15 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
       jobListRef.current.scrollTop = 0;
     }
   }, [currentPage]);
+
+  // 案件選択ハンドラ（モバイル対応）
+  const handleJobSelect = (job: Job) => {
+    setSelectedJob(job);
+    // モバイルではモーダルを開く
+    if (window.innerWidth < 768) {
+      setIsModalOpen(true);
+    }
+  };
 
   const filteredAndSortedJobs = useMemo(() => {
     const result = jobs.filter((job) => {
@@ -84,9 +96,23 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
 
   return (
     <div className="h-screen flex flex-col">
-      <Header />
+      <Header onMenuClick={() => setIsSidebarOpen(true)} />
       <div className="flex-1 flex overflow-hidden">
-        <Sidebar isAdmin={isAdmin} />
+        {/* Sidebarはデスクトップのみ表示 */}
+        <div className="hidden md:block">
+          <Sidebar isAdmin={isAdmin} />
+        </div>
+
+        {/* モバイル用サイドバー（オーバーレイ） */}
+        {isSidebarOpen && (
+          <div className="fixed inset-0 z-50 md:hidden">
+            <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsSidebarOpen(false)} />
+            <div className="relative w-64 h-full bg-white animate-slide-in-left">
+              <Sidebar isAdmin={isAdmin} />
+            </div>
+          </div>
+        )}
+
         <SplitLayout
           left={
             <div className="flex flex-col h-full">
@@ -122,7 +148,7 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                 {paginatedJobs.map((job) => (
                   <div
                     key={job.id}
-                    onClick={() => setSelectedJob(job)}
+                    onClick={() => handleJobSelect(job)}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       selectedJob?.id === job.id
                         ? 'border-blue-500 bg-blue-50'
@@ -256,6 +282,15 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
           }
         />
       </div>
+
+      {/* モバイル用モーダル */}
+      {isModalOpen && selectedJob && (
+        <JobDetailModal
+          job={selectedJob}
+          isAdmin={isAdmin}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
