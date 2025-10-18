@@ -44,13 +44,14 @@ model Job {
 
 // スキルマスタ
 model Skill {
-  id        String     @id @default(cuid())
-  name      String     @unique // React, Go, TypeScript等
-  category  String?    // frontend, backend, infrastructure等
+  id        String        @id @default(cuid())
+  name      String        @unique // React, Go, TypeScript等
+  category  String?       // frontend, backend, infrastructure等
   jobs      JobSkill[]
+  talents   TalentSkill[]
 
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 // 案件とスキルの中間テーブル
@@ -63,5 +64,51 @@ model JobSkill {
 
   @@unique([jobId, skillId])
   @@index([jobId])
+  @@index([skillId])
+}
+
+// 人材情報（メール1件 = Talent 1レコード）
+model Talent {
+  id          String   @id @default(cuid())
+
+  // AI抽出された情報（公開用）
+  name        String?  // 名前（匿名の場合はニックネームや「非公開」）
+  age         Int?     // 年齢
+  position    String?  // ポジション（SE, チームリーダー, テックリード, PMO, PM）
+  workStyle   String?  // 勤務形態（常駐可、リモート希望など）
+  location    String?  // 希望勤務地
+  unitPrice   Int?     // 希望単価（月額、単位：円）
+  summary     String?  @db.Text // 経歴概要
+  description String?  @db.Text // 詳細経歴
+
+  // メール原文
+  originalTitle   String  // 元のメールタイトル（件名）
+  originalBody    String  @db.Text // 元のメール本文
+  senderEmail     String  // 送信者メールアドレス
+  receivedAt      DateTime // メール受信日時
+
+  // スキルタグ（多対多）
+  skills      TalentSkill[]
+
+  // メタ情報
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([receivedAt])
+  @@index([position])
+  @@index([age])
+  @@index([unitPrice])
+}
+
+// 人材とスキルの中間テーブル
+model TalentSkill {
+  id        String @id @default(cuid())
+  talent    Talent @relation(fields: [talentId], references: [id], onDelete: Cascade)
+  talentId  String
+  skill     Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skillId   String
+
+  @@unique([talentId, skillId])
+  @@index([talentId])
   @@index([skillId])
 }
