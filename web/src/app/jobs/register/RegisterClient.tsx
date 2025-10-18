@@ -7,13 +7,11 @@ import Sidebar from '@/components/Sidebar';
 import { createJob } from './actions';
 
 const gradeOptions = [
-  { value: 'S1', label: 'S1:サポート前提' },
-  { value: 'S2', label: 'S2:単独作業' },
-  { value: 'S3', label: 'S3:メンター' },
-  { value: 'S4', label: 'S4:主力' },
-  { value: 'S5', label: 'S5:リーダー' },
-  { value: 'SS', label: 'SS:テックリード' },
-  { value: 'MG', label: 'MG:マネージャー' },
+  { value: 'SE', label: 'SE' },
+  { value: 'チームリーダー', label: 'チームリーダー' },
+  { value: 'テックリード', label: 'テックリード' },
+  { value: 'PMO', label: 'PMO' },
+  { value: 'PM', label: 'PM' },
 ];
 
 const availableSkills = [
