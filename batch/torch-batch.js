@@ -84,8 +84,44 @@ function processSingleMail(message) {
 
     console.log(`メール処理開始: ${subject}`);
 
-    // Gemini APIで案件情報を抽出
-    const prompt = createJobExtractionPrompt(mailBody, subject);
+    // ステップ1: メールの種類を判定（人材 or 案件 or その他）
+    const typePrompt = createTypeDetectionPrompt(mailBody, subject);
+    const typeResponse = callGeminiAPI(typePrompt);
+
+    if (!typeResponse) {
+      console.error(`メールID: ${message.getId()} の種類判定に失敗しました。`);
+      return 'error';
+    }
+
+    let typeData;
+    try {
+      typeData = JSON.parse(typeResponse);
+    } catch (e) {
+      console.error(`種類判定JSONパースエラー: ${typeResponse}`);
+      return 'error';
+    }
+
+    console.log(`メール種類判定: ${typeData.type} (確信度: ${typeData.confidence})`);
+
+    // 確信度が低い場合、またはその他の場合はスキップ
+    if (typeData.confidence !== 'high' || typeData.type === 'other') {
+      console.log(`メールID: ${message.getId()} は処理対象外のためスキップします。種類: ${typeData.type}, 確信度: ${typeData.confidence}`);
+      return 'skip';
+    }
+
+    // ステップ2: 種類に応じて情報を抽出
+    let extractedData;
+    let prompt;
+
+    if (typeData.type === 'talent') {
+      prompt = createTalentExtractionPrompt(mailBody, subject);
+    } else if (typeData.type === 'job') {
+      prompt = createJobExtractionPrompt(mailBody, subject);
+    } else {
+      console.log(`メールID: ${message.getId()} は不明な種類のためスキップします。`);
+      return 'skip';
+    }
+
     const aiResponse = callGeminiAPI(prompt);
 
     if (!aiResponse) {
@@ -93,48 +129,182 @@ function processSingleMail(message) {
       return 'error';
     }
 
-    let jobData;
     try {
-      jobData = JSON.parse(aiResponse);
+      extractedData = JSON.parse(aiResponse);
     } catch (e) {
       console.error(`JSONパースエラー: ${aiResponse}`);
       return 'error';
     }
 
-    // 案件情報が見つからない場合はスキップ
-    if (!jobData.title || jobData.title.trim() === "") {
-      console.log(`メールID: ${message.getId()} からは案件情報が見つかりませんでした。`);
-      return 'skip';
-    }
+    // ステップ3: 適切なAPIに送信
+    let apiResult;
 
-    // Torch APIに送信
-    const apiResult = sendToTorchAPI({
-      title: jobData.title,
-      company: jobData.company,
-      grade: jobData.grade,
-      location: jobData.location,
-      unitPrice: jobData.unitPrice,
-      summary: jobData.summary,
-      description: jobData.description,
-      originalTitle: subject,
-      originalBody: mailBody,
-      senderEmail: from,
-      receivedAt: mailDate.toISOString(),
-      skills: jobData.skills || []
-    });
+    if (typeData.type === 'talent') {
+      // 人材情報が見つからない場合はスキップ
+      if (!extractedData.summary || extractedData.summary.trim() === "") {
+        console.log(`メールID: ${message.getId()} からは人材情報が見つかりませんでした。`);
+        return 'skip';
+      }
 
-    if (apiResult.success) {
-      console.log(`案件を保存しました: ${jobData.title} (ID: ${apiResult.jobId})`);
-      return 'success';
-    } else {
-      console.error(`API送信エラー: ${apiResult.error}`);
-      return 'error';
+      apiResult = sendToTalentAPI({
+        name: extractedData.name,
+        age: extractedData.age,
+        position: extractedData.position,
+        workStyle: extractedData.workStyle,
+        location: extractedData.location,
+        unitPrice: extractedData.unitPrice,
+        summary: extractedData.summary,
+        description: extractedData.description,
+        originalTitle: subject,
+        originalBody: mailBody,
+        senderEmail: from,
+        receivedAt: mailDate.toISOString(),
+        skills: extractedData.skills || []
+      });
+
+      if (apiResult.success) {
+        console.log(`人材を保存しました: ${extractedData.name || '非公開'} (ID: ${apiResult.talentId})`);
+        return 'success';
+      } else {
+        console.error(`人材API送信エラー: ${apiResult.error}`);
+        return 'error';
+      }
+
+    } else if (typeData.type === 'job') {
+      // 案件情報が見つからない場合はスキップ
+      if (!extractedData.title || extractedData.title.trim() === "") {
+        console.log(`メールID: ${message.getId()} からは案件情報が見つかりませんでした。`);
+        return 'skip';
+      }
+
+      apiResult = sendToJobAPI({
+        title: extractedData.title,
+        company: extractedData.company,
+        grade: extractedData.grade,
+        location: extractedData.location,
+        unitPrice: extractedData.unitPrice,
+        summary: extractedData.summary,
+        description: extractedData.description,
+        originalTitle: subject,
+        originalBody: mailBody,
+        senderEmail: from,
+        receivedAt: mailDate.toISOString(),
+        skills: extractedData.skills || []
+      });
+
+      if (apiResult.success) {
+        console.log(`案件を保存しました: ${extractedData.title} (ID: ${apiResult.jobId})`);
+        return 'success';
+      } else {
+        console.error(`案件API送信エラー: ${apiResult.error}`);
+        return 'error';
+      }
     }
 
   } catch(e) {
     console.error(`メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`);
     return 'error';
   }
+}
+
+/**
+ * メール種類判定用のプロンプト
+ */
+function createTypeDetectionPrompt(mailBody, subject) {
+  return `
+以下のメールが「人材情報」「案件情報」「その他」のいずれかを判定してください。
+
+【メール件名】
+${subject}
+
+【メール本文】
+${mailBody}
+
+【判定基準】
+- **人材情報(talent)**: エンジニアのスキルシート、経歴書、人材紹介、稼働可能な人の情報
+  - キーワード例: 「スキルシート」「経歴書」「〇〇歳」「参画可能」「稼働中」「ご紹介」「人材」「エンジニア募集」ではなく「エンジニア紹介」
+- **案件情報(job)**: プロジェクト募集、業務委託案件、求人情報
+  - キーワード例: 「案件」「募集」「プロジェクト」「参画者募集」「〇〇万円/月」で募集している
+- **その他(other)**: 営業メール、挨拶、会議調整、問い合わせ、返信など
+
+【重要】
+- 迷った場合は確信度を"low"または"medium"にしてください
+- 人材情報と案件情報が混在している場合は、メインの内容で判定してください
+- 件名だけでなく本文の内容を重視してください
+
+【出力形式】
+必ず以下のJSON形式で返却してください。
+
+\`\`\`json
+{
+  "type": "talent" | "job" | "other",
+  "confidence": "high" | "medium" | "low",
+  "reason": "判定理由を簡潔に"
+}
+\`\`\`
+`;
+}
+
+/**
+ * 人材情報抽出用のプロンプト
+ */
+function createTalentExtractionPrompt(mailBody, subject) {
+  return `
+以下のメール本文から、人材情報を抽出してJSON形式で出力してください。
+
+【メール件名】
+${subject}
+
+【メール本文】
+${mailBody}
+
+【抽出ルール】
+- **name**: 名前（匿名の場合はnull）
+- **age**: 年齢（数値のみ）
+- **position**: ポジション。必ず以下のいずれかを設定してください（必須項目）
+  - チームリーダー: チームリーダー、リーダー
+  - テックリード: テックリード、技術責任者
+  - PMO: PMO
+  - PM: プロジェクトマネージャー、マネージャー
+  - SE: その他のエンジニア（デフォルト）
+  ※明示されていない場合、またはどれにも該当しない場合は必ず「SE」を設定してください
+- **workStyle**: 勤務形態（例: "常駐可", "リモート希望", "週3日リモート"）
+- **location**: 希望勤務地（例: "東京都渋谷区"）
+- **unitPrice**: 希望単価（数値のみ、万円単位）
+  - 「70万円(140-200)」 → 70（括弧内は無視）
+  - 「60~70万」 → 65（中央値）
+  - 「80万～100万」 → 90（中央値）
+- **summary**: 経歴概要（200字以内で要約）
+- **description**: 詳細経歴（業務経験、プロジェクト履歴など）
+- **skills**: 保有スキルの配列
+  - 技術名を正確に抽出し、以下の表記ルールに従って正規化してください
+  - 大文字小文字: .NET, JavaScript, TypeScript, MySQL, PostgreSQL, GitHub, Git, Linux
+  - スラッシュ表記: CI/CD, HTML/CSS, PL/SQL
+  - スペース表記: React Native, Spring Boot, AWS Lambda, AWS S3, SQL Server
+  - ハイフン表記: Intra-mart
+  - フレームワーク略記: React（React.jsではなく）, Vue（Vue.jsではなく）, Next.js, Nest.js
+  - 製品名: VMware, Windows Server, Microsoft 365, Power BI, Oracle DB
+  - その他の統一表記: Palo Alto, Entra ID, Kubernetes（K8sではなく）, SageMaker
+
+【出力形式】
+必ず以下のJSON形式で、\`\`\`json ... \`\`\` のブロックで返却してください。
+
+\`\`\`json
+{
+  "name": null,
+  "age": null,
+  "position": "SE",
+  "workStyle": "",
+  "location": "",
+  "unitPrice": null,
+  "summary": "",
+  "description": "",
+  "skills": []
+}
+\`\`\`
+
+※注意: positionは必須項目です。nullは不可。
+`;
 }
 
 /**
@@ -151,10 +321,7 @@ ${subject}
 ${mailBody}
 
 【指示】
-1. このメールが案件情報（求人情報、プロジェクト募集、業務委託案件）を含む場合のみ、情報を抽出してください
-2. 人材情報（エンジニアの経歴書、スキルシート）の場合は、titleを空文字にしてください
-3. 営業メール、挨拶メール、会議調整などの場合も、titleを空文字にしてください
-4. 各項目は以下のルールに従って抽出してください：
+このメールから案件情報を抽出してください。以下のルールに従って抽出してください：
 
 ## 抽出ルール
 
@@ -248,9 +415,9 @@ function callGeminiAPI(prompt) {
 }
 
 /**
- * Torch APIに案件情報を送信
+ * 案件APIに送信
  */
-function sendToTorchAPI(jobData) {
+function sendToJobAPI(jobData) {
   const url = `${TORCH_API_URL_CONFIG}/api/jobs/import`;
 
   const options = {
@@ -271,12 +438,46 @@ function sendToTorchAPI(jobData) {
     if (responseCode === 200) {
       return JSON.parse(responseBody);
     } else {
-      console.error(`Torch APIエラー (${responseCode}): ${responseBody}`);
+      console.error(`案件APIエラー (${responseCode}): ${responseBody}`);
       return { success: false, error: `API returned ${responseCode}` };
     }
 
   } catch (e) {
-    console.error("Torch API呼び出しエラー: " + e.toString());
+    console.error("案件API呼び出しエラー: " + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+/**
+ * 人材APIに送信
+ */
+function sendToTalentAPI(talentData) {
+  const url = `${TORCH_API_URL_CONFIG}/api/talents/import`;
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      'X-API-Key': TORCH_API_KEY_CONFIG
+    },
+    payload: JSON.stringify(talentData),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      return JSON.parse(responseBody);
+    } else {
+      console.error(`人材APIエラー (${responseCode}): ${responseBody}`);
+      return { success: false, error: `API returned ${responseCode}` };
+    }
+
+  } catch (e) {
+    console.error("人材API呼び出しエラー: " + e.toString());
     return { success: false, error: e.toString() };
   }
 }
