@@ -155,7 +155,12 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                         : 'border-gray-200 hover:border-gray-300 bg-white'
                     }`}
                   >
-                    <h3 className="font-semibold text-gray-900">{job.title}</h3>
+                    <div className="flex items-start justify-between">
+                      <h3 className="font-semibold text-gray-900 flex-1">{job.title}</h3>
+                      <span className="text-xs text-gray-400 ml-2">
+                        {new Date(job.receivedAt).toLocaleDateString('ja-JP')}
+                      </span>
+                    </div>
                     {isAdmin && job.company && (
                       <p className="text-sm text-gray-600 mt-1">{job.company}</p>
                     )}
@@ -220,6 +225,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                       </p>
                     )}
                     <p className="text-xs text-gray-400 mt-1">ID: {selectedJob.id}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      着信日: {new Date(selectedJob.receivedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
                     {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">
                         {selectedJob.unitPrice}万円/月
