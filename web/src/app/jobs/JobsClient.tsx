@@ -31,6 +31,7 @@ type JobsClientProps = {
 export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const [selectedJob, setSelectedJob] = useState(jobs[0]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [idQuery, setIdQuery] = useState('');
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,6 +60,11 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
 
   const filteredAndSortedJobs = useMemo(() => {
     const result = jobs.filter((job) => {
+      // ID検索が入力されている場合は、IDのみで検索
+      if (idQuery !== '') {
+        return job.id.toLowerCase().includes(idQuery.toLowerCase());
+      }
+
       const matchesSearch =
         searchQuery === '' ||
         job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -80,7 +86,7 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
     });
 
     return result;
-  }, [jobs, searchQuery, gradeFilters, sortOrder]);
+  }, [jobs, searchQuery, idQuery, gradeFilters, sortOrder]);
 
   // ページネーション
   const totalPages = Math.ceil(filteredAndSortedJobs.length / ITEMS_PER_PAGE);
@@ -88,6 +94,13 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredAndSortedJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredAndSortedJobs, currentPage]);
+
+  // ID検索で1件に絞り込まれた場合、自動的にその案件を選択
+  useEffect(() => {
+    if (idQuery !== '' && filteredAndSortedJobs.length === 1) {
+      setSelectedJob(filteredAndSortedJobs[0]);
+    }
+  }, [idQuery, filteredAndSortedJobs]);
 
   // フィルタ変更時にページを1にリセット
   const handleFilterChange = () => {
@@ -140,6 +153,10 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                   }}
                   onGradeFilter={(grades) => {
                     setGradeFilters(grades);
+                    handleFilterChange();
+                  }}
+                  onIdSearch={(id) => {
+                    setIdQuery(id);
                     handleFilterChange();
                   }}
                 />
