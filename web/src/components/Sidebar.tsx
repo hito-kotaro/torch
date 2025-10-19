@@ -13,6 +13,7 @@ type MenuItem = {
 
 const menuItems: MenuItem[] = [
   { id: 'jobs', label: '案件一覧', icon: '📋', href: '/jobs' },
+  { id: 'analytics', label: '案件分析', icon: '📊', href: '/analytics' },
   { id: 'register', label: '手動登録', icon: '✏️', href: '/jobs/register', adminOnly: true },
 ];
 
