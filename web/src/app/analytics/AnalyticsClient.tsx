@@ -174,7 +174,74 @@ export default function AnalyticsClient({ jobs, userRole }: AnalyticsClientProps
 
             {/* 日別案件数グラフ */}
             <div className="bg-white p-6 rounded-lg shadow mb-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">日別案件着信数</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">日別案件着信数（折れ線グラフ）</h2>
+              <div className="h-64 relative">
+                <svg className="w-full h-full" viewBox="0 0 800 250" preserveAspectRatio="none">
+                  {/* グリッド線 */}
+                  {[0, 1, 2, 3, 4].map((i) => {
+                    const y = (i * 250) / 4;
+                    return (
+                      <g key={i}>
+                        <line
+                          x1="0"
+                          y1={y}
+                          x2="800"
+                          y2={y}
+                          stroke="#e5e7eb"
+                          strokeWidth="1"
+                        />
+                        <text
+                          x="-5"
+                          y={y}
+                          fontSize="12"
+                          fill="#6b7280"
+                          textAnchor="end"
+                          dominantBaseline="middle"
+                        >
+                          {Math.round(maxDailyCount * (4 - i) / 4)}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* 折れ線 */}
+                  <polyline
+                    points={dailyStats.map(([, count], index) => {
+                      const x = (index / (dailyStats.length - 1)) * 800;
+                      const y = 250 - (count / maxDailyCount) * 250;
+                      return `${x},${y}`;
+                    }).join(' ')}
+                    fill="none"
+                    stroke="#3b82f6"
+                    strokeWidth="2"
+                  />
+
+                  {/* データポイント */}
+                  {dailyStats.map(([, count], index) => {
+                    const x = (index / (dailyStats.length - 1)) * 800;
+                    const y = 250 - (count / maxDailyCount) * 250;
+                    return (
+                      <circle
+                        key={index}
+                        cx={x}
+                        cy={y}
+                        r="4"
+                        fill="#3b82f6"
+                      />
+                    );
+                  })}
+                </svg>
+              </div>
+              <div className="flex justify-between mt-4 text-xs text-gray-600">
+                <span>{dailyStats[0]?.[0]}</span>
+                <span>{dailyStats[Math.floor(dailyStats.length / 2)]?.[0]}</span>
+                <span>{dailyStats[dailyStats.length - 1]?.[0]}</span>
+              </div>
+            </div>
+
+            {/* 日別案件数グラフ（棒グラフ） */}
+            <div className="bg-white p-6 rounded-lg shadow mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">日別案件着信数（棒グラフ）</h2>
               <div className="space-y-2">
                 {dailyStats.map(([date, count]) => (
                   <div key={date} className="flex items-center gap-4">
