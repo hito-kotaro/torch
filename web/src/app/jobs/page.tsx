@@ -22,7 +22,7 @@ async function getJobs(isAdmin: boolean) {
     company: job.company,
     location: job.location,
     grade: job.grade,
-    unitPrice: isAdmin ? job.unitPrice : null, // 管理者のみ単価を返す
+    unitPrice: job.unitPrice, // フィルタリング用に全ユーザーに返す（表示は管理者のみ）
     summary: job.summary,
     description: job.description,
     originalTitle: isAdmin ? job.originalTitle : null, // 管理者のみ原文タイトルを返す

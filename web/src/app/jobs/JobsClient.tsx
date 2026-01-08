@@ -33,8 +33,11 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [idQuery, setIdQuery] = useState("");
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
+  const [skillFilters, setSkillFilters] = useState<string[]>([]);
   const [minUnitPrice, setMinUnitPrice] = useState<number | null>(null);
   const [maxUnitPrice, setMaxUnitPrice] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false); // モーダル表示状態
@@ -78,13 +81,65 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
         (job.grade && gradeFilters.includes(job.grade));
 
       // 単価フィルター（unitPriceが存在する場合のみ）
-      const matchesUnitPrice =
-        job.unitPrice === null ||
-        (minUnitPrice === null && maxUnitPrice === null) ||
-        ((minUnitPrice === null || job.unitPrice >= minUnitPrice) &&
-          (maxUnitPrice === null || job.unitPrice <= maxUnitPrice));
+      // データベースのunitPriceは万円単位で保存されている想定
+      // unitPriceがnullの場合はフィルター対象外（表示される）
+      // フィルターが設定されている場合のみ、unitPriceがnullの案件を除外
+      let matchesUnitPrice = true;
+      if (minUnitPrice !== null || maxUnitPrice !== null) {
+        // フィルターが設定されている場合
+        if (job.unitPrice === null) {
+          // unitPriceがnullの案件は除外
+          matchesUnitPrice = false;
+        } else {
+          // unitPriceが存在する場合、範囲チェック
+          matchesUnitPrice =
+            (minUnitPrice === null || job.unitPrice >= minUnitPrice) &&
+            (maxUnitPrice === null || job.unitPrice <= maxUnitPrice);
+        }
+      }
 
-      return matchesSearch && matchesGrade && matchesUnitPrice;
+      // スキルフィルター
+      const matchesSkill =
+        skillFilters.length === 0 ||
+        skillFilters.some((skill) =>
+          job.skills.some(
+            (jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()
+          )
+        );
+
+      // 着信日フィルター
+      let matchesDate = true;
+      if (startDate !== null || endDate !== null) {
+        const jobDate = new Date(job.receivedAt);
+        jobDate.setHours(0, 0, 0, 0); // 時刻を0時にリセット
+
+        if (startDate !== null && endDate !== null) {
+          // 両方指定されている場合
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999); // 終了日の23:59:59まで
+          matchesDate = jobDate >= start && jobDate <= end;
+        } else if (startDate !== null) {
+          // 開始日のみ指定
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          matchesDate = jobDate >= start;
+        } else if (endDate !== null) {
+          // 終了日のみ指定
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          matchesDate = jobDate <= end;
+        }
+      }
+
+      return (
+        matchesSearch &&
+        matchesGrade &&
+        matchesSkill &&
+        matchesUnitPrice &&
+        matchesDate
+      );
     });
 
     // ソート処理
@@ -100,8 +155,11 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
     searchQuery,
     idQuery,
     gradeFilters,
+    skillFilters,
     minUnitPrice,
     maxUnitPrice,
+    startDate,
+    endDate,
     sortOrder,
   ]);
 
@@ -181,9 +239,18 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     setIdQuery(id);
                     handleFilterChange();
                   }}
+                  onSkillFilter={(skills) => {
+                    setSkillFilters(skills);
+                    handleFilterChange();
+                  }}
                   onUnitPriceFilter={(min, max) => {
                     setMinUnitPrice(min);
                     setMaxUnitPrice(max);
+                    handleFilterChange();
+                  }}
+                  onDateRangeFilter={(start, end) => {
+                    setStartDate(start);
+                    setEndDate(end);
                     handleFilterChange();
                   }}
                 />
