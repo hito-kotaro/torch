@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useMemo, useRef, useEffect } from 'react';
-import Header from '@/components/Header';
-import Sidebar from '@/components/Sidebar';
-import SplitLayout from '@/components/SplitLayout';
-import SearchBar from '@/components/SearchBar';
-import JobDetailModal from '@/components/JobDetailModal';
+import { useState, useMemo, useRef, useEffect } from "react";
+import Header from "@/components/Header";
+import Sidebar from "@/components/Sidebar";
+import SplitLayout from "@/components/SplitLayout";
+import SearchBar from "@/components/SearchBar";
+import JobDetailModal from "@/components/JobDetailModal";
 
 type Job = {
   id: string;
@@ -25,22 +25,27 @@ type Job = {
 
 type JobsClientProps = {
   jobs: Job[];
-  userRole: 'admin' | 'general';
+  userRole: "admin" | "general";
 };
 
 export default function JobsClient({ jobs, userRole }: JobsClientProps) {
-  const [selectedJob, setSelectedJob] = useState(jobs[0]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [idQuery, setIdQuery] = useState('');
+  const [selectedJob, setSelectedJob] = useState<Job | null>(jobs[0] || null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [idQuery, setIdQuery] = useState("");
   const [gradeFilters, setGradeFilters] = useState<string[]>([]);
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc'); // 新しい順がデフォルト
+  const [skillFilters, setSkillFilters] = useState<string[]>([]);
+  const [minUnitPrice, setMinUnitPrice] = useState<number | null>(null);
+  const [maxUnitPrice, setMaxUnitPrice] = useState<number | null>(null);
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // 新しい順がデフォルト
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false); // モーダル表示状態
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバー開閉状態
   const ITEMS_PER_PAGE = 50;
   const jobListRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = userRole === 'admin';
+  const isAdmin = userRole === "admin";
 
   // ページ変更時にスクロールを一番上に戻す
   useEffect(() => {
@@ -61,12 +66,12 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
   const filteredAndSortedJobs = useMemo(() => {
     const result = jobs.filter((job) => {
       // ID検索が入力されている場合は、IDのみで検索
-      if (idQuery !== '') {
+      if (idQuery !== "") {
         return job.id.toLowerCase().includes(idQuery.toLowerCase());
       }
 
       const matchesSearch =
-        searchQuery === '' ||
+        searchQuery === "" ||
         job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         job.summary?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -75,18 +80,88 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
         gradeFilters.length === 0 ||
         (job.grade && gradeFilters.includes(job.grade));
 
-      return matchesSearch && matchesGrade;
+      // 単価フィルター（unitPriceが存在する場合のみ）
+      // データベースのunitPriceは万円単位で保存されている想定
+      // unitPriceがnullの場合はフィルター対象外（表示される）
+      // フィルターが設定されている場合のみ、unitPriceがnullの案件を除外
+      let matchesUnitPrice = true;
+      if (minUnitPrice !== null || maxUnitPrice !== null) {
+        // フィルターが設定されている場合
+        if (job.unitPrice === null) {
+          // unitPriceがnullの案件は除外
+          matchesUnitPrice = false;
+        } else {
+          // unitPriceが存在する場合、範囲チェック
+          matchesUnitPrice =
+            (minUnitPrice === null || job.unitPrice >= minUnitPrice) &&
+            (maxUnitPrice === null || job.unitPrice <= maxUnitPrice);
+        }
+      }
+
+      // スキルフィルター
+      const matchesSkill =
+        skillFilters.length === 0 ||
+        skillFilters.some((skill) =>
+          job.skills.some(
+            (jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()
+          )
+        );
+
+      // 着信日フィルター
+      let matchesDate = true;
+      if (startDate !== null || endDate !== null) {
+        const jobDate = new Date(job.receivedAt);
+        jobDate.setHours(0, 0, 0, 0); // 時刻を0時にリセット
+
+        if (startDate !== null && endDate !== null) {
+          // 両方指定されている場合
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999); // 終了日の23:59:59まで
+          matchesDate = jobDate >= start && jobDate <= end;
+        } else if (startDate !== null) {
+          // 開始日のみ指定
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          matchesDate = jobDate >= start;
+        } else if (endDate !== null) {
+          // 終了日のみ指定
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          matchesDate = jobDate <= end;
+        }
+      }
+
+      return (
+        matchesSearch &&
+        matchesGrade &&
+        matchesSkill &&
+        matchesUnitPrice &&
+        matchesDate
+      );
     });
 
     // ソート処理
     result.sort((a, b) => {
       const dateA = new Date(a.receivedAt).getTime();
       const dateB = new Date(b.receivedAt).getTime();
-      return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
     });
 
     return result;
-  }, [jobs, searchQuery, idQuery, gradeFilters, sortOrder]);
+  }, [
+    jobs,
+    searchQuery,
+    idQuery,
+    gradeFilters,
+    skillFilters,
+    minUnitPrice,
+    maxUnitPrice,
+    startDate,
+    endDate,
+    sortOrder,
+  ]);
 
   // ページネーション
   const totalPages = Math.ceil(filteredAndSortedJobs.length / ITEMS_PER_PAGE);
@@ -97,7 +172,7 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
 
   // ID検索で1件に絞り込まれた場合、自動的にその案件を選択
   useEffect(() => {
-    if (idQuery !== '' && filteredAndSortedJobs.length === 1) {
+    if (idQuery !== "" && filteredAndSortedJobs.length === 1) {
       setSelectedJob(filteredAndSortedJobs[0]);
     }
   }, [idQuery, filteredAndSortedJobs]);
@@ -119,7 +194,10 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
         {/* モバイル用サイドバー（オーバーレイ） */}
         {isSidebarOpen && (
           <div className="fixed inset-0 z-50 md:hidden">
-            <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsSidebarOpen(false)} />
+            <div
+              className="absolute inset-0 bg-black bg-opacity-50"
+              onClick={() => setIsSidebarOpen(false)}
+            />
             <div className="relative w-64 h-full bg-white animate-slide-in-left">
               <Sidebar isAdmin={isAdmin} />
             </div>
@@ -138,7 +216,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     </span>
                     <select
                       value={sortOrder}
-                      onChange={(e) => setSortOrder(e.target.value as 'desc' | 'asc')}
+                      onChange={(e) =>
+                        setSortOrder(e.target.value as "desc" | "asc")
+                      }
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="desc">新しい順</option>
@@ -159,27 +239,48 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     setIdQuery(id);
                     handleFilterChange();
                   }}
+                  onSkillFilter={(skills) => {
+                    setSkillFilters(skills);
+                    handleFilterChange();
+                  }}
+                  onUnitPriceFilter={(min, max) => {
+                    setMinUnitPrice(min);
+                    setMaxUnitPrice(max);
+                    handleFilterChange();
+                  }}
+                  onDateRangeFilter={(start, end) => {
+                    setStartDate(start);
+                    setEndDate(end);
+                    handleFilterChange();
+                  }}
                 />
               </div>
-              <div ref={jobListRef} className="flex-1 overflow-y-auto p-6 pt-4 space-y-3">
+              <div
+                ref={jobListRef}
+                className="flex-1 overflow-y-auto p-6 pt-4 space-y-3"
+              >
                 {paginatedJobs.map((job) => (
                   <div
                     key={job.id}
                     onClick={() => handleJobSelect(job)}
                     className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                       selectedJob?.id === job.id
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
                     }`}
                   >
                     <div className="flex items-start justify-between">
-                      <h3 className="font-semibold text-gray-900 flex-1">{job.title}</h3>
+                      <h3 className="font-semibold text-gray-900 flex-1">
+                        {job.title}
+                      </h3>
                       <span className="text-xs text-gray-400 ml-2">
-                        {new Date(job.receivedAt).toLocaleDateString('ja-JP')}
+                        {new Date(job.receivedAt).toLocaleDateString("ja-JP")}
                       </span>
                     </div>
                     {isAdmin && job.company && (
-                      <p className="text-sm text-gray-600 mt-1">{job.company}</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {job.company}
+                      </p>
                     )}
                     <p className="text-sm text-gray-500 mt-1">{job.location}</p>
                     {isAdmin && job.unitPrice && (
@@ -213,7 +314,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     {currentPage} / {totalPages} ページ
                   </span>
                   <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                   >
@@ -225,7 +328,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
           }
           right={
             <div className="p-6 overflow-y-auto">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">案件詳細</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                案件詳細
+              </h2>
               {selectedJob && (
                 <div className="space-y-4">
                   <div>
@@ -233,7 +338,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                       {selectedJob.title}
                     </h3>
                     {isAdmin && selectedJob.company && (
-                      <p className="text-gray-600 mt-2">{selectedJob.company}</p>
+                      <p className="text-gray-600 mt-2">
+                        {selectedJob.company}
+                      </p>
                     )}
                     <p className="text-gray-500 mt-1">{selectedJob.location}</p>
                     {selectedJob.grade && (
@@ -241,9 +348,15 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                         ポジション: {selectedJob.grade}
                       </p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1">ID: {selectedJob.id}</p>
                     <p className="text-xs text-gray-400 mt-1">
-                      着信日: {new Date(selectedJob.receivedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      ID: {selectedJob.id}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      着信日:{" "}
+                      {new Date(selectedJob.receivedAt).toLocaleDateString(
+                        "ja-JP",
+                        { year: "numeric", month: "long", day: "numeric" }
+                      )}
                     </p>
                     {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">
@@ -287,19 +400,29 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                       </div>
                       {selectedJob.originalTitle && (
                         <div>
-                          <h4 className="font-semibold text-gray-900">元のメール件名</h4>
-                          <p className="text-gray-700 mt-2">{selectedJob.originalTitle}</p>
+                          <h4 className="font-semibold text-gray-900">
+                            元のメール件名
+                          </h4>
+                          <p className="text-gray-700 mt-2">
+                            {selectedJob.originalTitle}
+                          </p>
                         </div>
                       )}
                       {selectedJob.senderEmail && (
                         <div>
-                          <h4 className="font-semibold text-gray-900">送信者</h4>
-                          <p className="text-gray-700 mt-2">{selectedJob.senderEmail}</p>
+                          <h4 className="font-semibold text-gray-900">
+                            送信者
+                          </h4>
+                          <p className="text-gray-700 mt-2">
+                            {selectedJob.senderEmail}
+                          </p>
                         </div>
                       )}
                       {selectedJob.originalBody && (
                         <div>
-                          <h4 className="font-semibold text-gray-900">元のメール本文</h4>
+                          <h4 className="font-semibold text-gray-900">
+                            元のメール本文
+                          </h4>
                           <p className="text-gray-700 mt-2 whitespace-pre-wrap bg-gray-50 p-4 rounded border border-gray-200">
                             {selectedJob.originalBody}
                           </p>
