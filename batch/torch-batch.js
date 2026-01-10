@@ -488,7 +488,7 @@ ${mailBody}
  * @returns {Object} { success: boolean, data: string | null, isRateLimited: boolean }
  */
 function callGeminiAPI(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY_TORCH}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY_TORCH}`;
 
   const payload = {
     contents: [
