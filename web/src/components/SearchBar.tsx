@@ -48,6 +48,7 @@ export default function SearchBar({
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [dateError, setDateError] = useState<string>("");
+  const [unitPriceError, setUnitPriceError] = useState<string>("");
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +84,8 @@ export default function SearchBar({
   const handleMinUnitPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setMinUnitPrice(value);
+    setUnitPriceError("");
+    
     if (onUnitPriceFilter) {
       const numValue =
         value === ""
@@ -96,6 +99,21 @@ export default function SearchBar({
           : isNaN(parseFloat(maxUnitPrice))
           ? null
           : parseFloat(maxUnitPrice);
+      
+      // バリデーション: 上限と下限の両方が指定されている場合
+      if (numValue !== null && maxValue !== null) {
+        if (numValue > maxValue) {
+          setUnitPriceError("下限は上限以下を指定してください");
+          onUnitPriceFilter(null, null);
+          return;
+        }
+        if (maxValue - numValue < 10) {
+          setUnitPriceError("上限と下限の差は10万円以上である必要があります");
+          onUnitPriceFilter(null, null);
+          return;
+        }
+      }
+      
       onUnitPriceFilter(numValue, maxValue);
     }
   };
@@ -103,6 +121,8 @@ export default function SearchBar({
   const handleMaxUnitPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setMaxUnitPrice(value);
+    setUnitPriceError("");
+    
     if (onUnitPriceFilter) {
       const numValue =
         value === ""
@@ -116,6 +136,21 @@ export default function SearchBar({
           : isNaN(parseFloat(minUnitPrice))
           ? null
           : parseFloat(minUnitPrice);
+      
+      // バリデーション: 上限と下限の両方が指定されている場合
+      if (minValue !== null && numValue !== null) {
+        if (minValue > numValue) {
+          setUnitPriceError("下限は上限以下を指定してください");
+          onUnitPriceFilter(null, null);
+          return;
+        }
+        if (numValue - minValue < 10) {
+          setUnitPriceError("上限と下限の差は10万円以上である必要があります");
+          onUnitPriceFilter(null, null);
+          return;
+        }
+      }
+      
       onUnitPriceFilter(minValue, numValue);
     }
   };
@@ -199,6 +234,7 @@ export default function SearchBar({
     setStartDate("");
     setEndDate("");
     setDateError("");
+    setUnitPriceError("");
 
     // 親コンポーネントにリセットを通知
     onSearch("");
@@ -324,7 +360,9 @@ export default function SearchBar({
                     onChange={handleMinUnitPriceChange}
                     min="0"
                     step="1"
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-24 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      unitPriceError ? "border-red-500" : "border-gray-300"
+                    }`}
                   />
                   <span className="text-gray-500">〜</span>
                   <input
@@ -334,10 +372,15 @@ export default function SearchBar({
                     onChange={handleMaxUnitPriceChange}
                     min="0"
                     step="1"
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-24 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      unitPriceError ? "border-red-500" : "border-gray-300"
+                    }`}
                   />
                   <span className="text-sm text-gray-500">万円</span>
                 </div>
+                {unitPriceError && (
+                  <p className="text-sm text-red-600 mt-1">{unitPriceError}</p>
+                )}
               </div>
             )}
             {onDateRangeFilter && (
