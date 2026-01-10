@@ -16,6 +16,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Torch - 案件管理システム",
   description: "SES案件・人材情報管理システム",
+  icons: {
+    icon: [
+      { url: "/torch-icon.svg", sizes: "32x32", type: "image/svg+xml" },
+      { url: "/torch-icon.svg", sizes: "48x48", type: "image/svg+xml" },
+      { url: "/torch-icon.svg", sizes: "64x64", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/torch-icon.svg", sizes: "180x180", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({
