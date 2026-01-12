@@ -153,6 +153,7 @@ function processEmailsTrigger() {
 
     // 事前フィルタリング: 案件関連キーワードを含むメールのみを抽出
     const filteredMessages = [];
+    let talentCount = 0; // 事前フィルタリングでスキップされた人材メール数
     for (
       let i = 0;
       i < threads.length;
@@ -176,8 +177,11 @@ function processEmailsTrigger() {
         console.log(
           `メールID: ${message.getId()} は事前フィルタリングでスキップ: ${message.getSubject()}`
         );
-        // 案件ではないメールは既読にしてスキップ
+        // 案件ではないメール = 人材メールとして扱い、talentラベルを付与
+        const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
+        thread.addLabel(talentLabel);
         thread.markRead();
+        talentCount++;
       }
     }
 
@@ -203,10 +207,16 @@ function processEmailsTrigger() {
         if (result === "success") {
           successCount++;
           markAsProcessed(message.getId());
+          // 案件メールに "eigyo@luxy-inc.com/job" ラベルを追加
+          const jobLabel = getOrCreateLabel("eigyo@luxy-inc.com/job");
+          thread.addLabel(jobLabel);
           thread.markRead();
         } else if (result === "skip") {
           skipCount++;
           markAsProcessed(message.getId());
+          // 人材メールに "eigyo@luxy-inc.com/talent" ラベルを追加
+          const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
+          thread.addLabel(talentLabel);
           thread.markRead();
         } else {
           errorCount++;
@@ -224,9 +234,18 @@ function processEmailsTrigger() {
       }
     }
 
+    // 統計情報を出力
+    const totalCount = threads.length;
+    const jobCount = successCount; // 案件メール数
+    const totalTalentCount = talentCount + skipCount; // 人材メール数（事前フィルタリング + Gemini解析結果）
+
+    console.log("=== 処理結果統計 ===");
+    console.log(`全体数: ${totalCount}件`);
+    console.log(`案件メール数: ${jobCount}件`);
     console.log(
-      `処理完了: 成功=${successCount}, スキップ=${skipCount}, エラー=${errorCount}`
+      `人材メール数: ${totalTalentCount}件（事前フィルタリング: ${talentCount}件, Gemini解析後: ${skipCount}件）`
     );
+    console.log(`エラー数: ${errorCount}件`);
   } catch (e) {
     console.error(
       "メール検索または処理ループ全体でエラーが発生しました: " + e.toString()
