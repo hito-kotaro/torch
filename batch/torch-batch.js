@@ -12,9 +12,9 @@ var TORCH_API_KEY_CONFIG =
 
 // 設定
 var TARGET_EMAIL_TORCH = "eigyo@luxy-inc.com";
-var MAX_THREADS_TORCH = 100;
-var MAX_PROCESS_PER_RUN = 10; // 1回の実行で処理する最大メール数（APIリミット対策）
-var API_CALL_DELAY_MS = 500; // API呼び出し間の待機時間（ミリ秒）
+var MAX_THREADS_TORCH = 200;
+var MAX_PROCESS_PER_RUN = 10; // 1回の実行で処理する最大メール数（現在は制限なしで全件処理）
+var API_CALL_DELAY_MS = 1000; // API呼び出し間の待機時間（ミリ秒）
 
 // 案件関連キーワード（事前フィルタリング用）
 // 重み: 高いほど案件の可能性が高い
@@ -23,6 +23,7 @@ var JOB_KEYWORDS = {
   high: [
     "エンド直案件",
     "現場直案件",
+    "直案件",
     "案件",
     "単価変更",
     "求人",
@@ -152,9 +153,10 @@ function processEmailsTrigger() {
 
     // 事前フィルタリング: 案件関連キーワードを含むメールのみを抽出
     const filteredMessages = [];
+    let talentCount = 0; // 事前フィルタリングでスキップされた人材メール数
     for (
       let i = 0;
-      i < threads.length && filteredMessages.length < MAX_PROCESS_PER_RUN;
+      i < threads.length;
       i++
     ) {
       const thread = threads[i];
@@ -175,13 +177,16 @@ function processEmailsTrigger() {
         console.log(
           `メールID: ${message.getId()} は事前フィルタリングでスキップ: ${message.getSubject()}`
         );
-        // 案件ではないメールは既読にしてスキップ
+        // 案件ではないメール = 人材メールとして扱い、talentラベルを付与
+        const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
+        thread.addLabel(talentLabel);
         thread.markRead();
+        talentCount++;
       }
     }
 
     console.log(
-      `${filteredMessages.length}件のメールを処理します（最大${MAX_PROCESS_PER_RUN}件まで）。`
+      `${filteredMessages.length}件のメールを処理します。`
     );
 
     let successCount = 0;
@@ -202,10 +207,16 @@ function processEmailsTrigger() {
         if (result === "success") {
           successCount++;
           markAsProcessed(message.getId());
+          // 案件メールに "eigyo@luxy-inc.com/job" ラベルを追加
+          const jobLabel = getOrCreateLabel("eigyo@luxy-inc.com/job");
+          thread.addLabel(jobLabel);
           thread.markRead();
         } else if (result === "skip") {
           skipCount++;
           markAsProcessed(message.getId());
+          // 人材メールに "eigyo@luxy-inc.com/talent" ラベルを追加
+          const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
+          thread.addLabel(talentLabel);
           thread.markRead();
         } else {
           errorCount++;
@@ -223,9 +234,18 @@ function processEmailsTrigger() {
       }
     }
 
+    // 統計情報を出力
+    const totalCount = threads.length;
+    const jobCount = successCount; // 案件メール数
+    const totalTalentCount = talentCount + skipCount; // 人材メール数（事前フィルタリング + Gemini解析結果）
+
+    console.log("=== 処理結果統計 ===");
+    console.log(`全体数: ${totalCount}件`);
+    console.log(`案件メール数: ${jobCount}件`);
     console.log(
-      `処理完了: 成功=${successCount}, スキップ=${skipCount}, エラー=${errorCount}`
+      `人材メール数: ${totalTalentCount}件（事前フィルタリング: ${talentCount}件, Gemini解析後: ${skipCount}件）`
     );
+    console.log(`エラー数: ${errorCount}件`);
   } catch (e) {
     console.error(
       "メール検索または処理ループ全体でエラーが発生しました: " + e.toString()
