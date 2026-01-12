@@ -22,6 +22,7 @@ var JOB_KEYWORDS = {
   // 高重みキーワード（案件の可能性が非常に高い）
   high: [
     "エンド直案件",
+    "エンド直",
     "現場直案件",
     "直案件",
     "案件",
@@ -151,9 +152,9 @@ function processEmailsTrigger() {
 
     console.log(`${threads.length}件のメールスレッドが見つかりました。`);
 
-    // 事前フィルタリング: 案件関連キーワードを含むメールのみを抽出
+    // JobメールとTalentメールを分類（件名のみで判定）
     const filteredMessages = [];
-    let talentCount = 0; // 事前フィルタリングでスキップされた人材メール数
+    let talentCount = 0; // Talentメールとして分類されたメール数
     for (
       let i = 0;
       i < threads.length;
@@ -170,14 +171,14 @@ function processEmailsTrigger() {
         continue;
       }
 
-      // 事前フィルタリング: キーワードチェック
-      if (shouldProcessMail(message)) {
+      // 件名のみでJob/Talentを判定
+      if (isJobMail(message)) {
         filteredMessages.push({ thread: thread, message: message });
       } else {
         console.log(
-          `メールID: ${message.getId()} は事前フィルタリングでスキップ: ${message.getSubject()}`
+          `メールID: ${message.getId()} はTalentメールとして分類: ${message.getSubject()}`
         );
-        // 案件ではないメール = 人材メールとして扱い、talentラベルを付与
+        // Talentメールとして扱い、talentラベルを付与
         const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
         thread.addLabel(talentLabel);
         thread.markRead();
@@ -186,7 +187,7 @@ function processEmailsTrigger() {
     }
 
     console.log(
-      `${filteredMessages.length}件のメールを処理します。`
+      `Jobメール: ${filteredMessages.length}件, Talentメール: ${talentCount}件`
     );
 
     let successCount = 0;
@@ -236,16 +237,15 @@ function processEmailsTrigger() {
 
     // 統計情報を出力
     const totalCount = threads.length;
-    const jobCount = successCount; // 案件メール数
-    const totalTalentCount = talentCount + skipCount; // 人材メール数（事前フィルタリング + Gemini解析結果）
+    const jobCount = successCount; // Jobメール数（成功したもの）
+    const totalTalentCount = talentCount + skipCount; // Talentメール数（件名判定 + Gemini解析で案件情報が見つからなかったもの）
 
     console.log("=== 処理結果統計 ===");
     console.log(`全体数: ${totalCount}件`);
-    console.log(`案件メール数: ${jobCount}件`);
+    console.log(`Jobメール数: ${jobCount}件（エラー: ${errorCount}件）`);
     console.log(
-      `人材メール数: ${totalTalentCount}件（事前フィルタリング: ${talentCount}件, Gemini解析後: ${skipCount}件）`
+      `Talentメール数: ${totalTalentCount}件（件名判定: ${talentCount}件, Gemini解析後: ${skipCount}件）`
     );
-    console.log(`エラー数: ${errorCount}件`);
   } catch (e) {
     console.error(
       "メール検索または処理ループ全体でエラーが発生しました: " + e.toString()
@@ -254,77 +254,21 @@ function processEmailsTrigger() {
 }
 
 /**
- * メールが処理対象かどうかを判定（事前フィルタリング）
- * 案件と人材を切り分け、案件メールのみを処理対象とする
+ * メールがJobメールかどうかを判定（件名のみチェック）
  * @param {GmailMessage} message - Gmailメッセージオブジェクト
- * @returns {boolean} 処理対象（案件メール）の場合true
+ * @returns {boolean} Jobメールの場合true、Talentメールの場合false
  */
-function shouldProcessMail(message) {
+function isJobMail(message) {
   const subject = message.getSubject().toLowerCase();
-  const body = message.getPlainBody().toLowerCase();
-  const text = (subject + " " + body).toLowerCase();
 
-  // 除外キーワードが含まれている場合はスキップ
-  for (let i = 0; i < EXCLUDE_KEYWORDS.length; i++) {
-    if (text.includes(EXCLUDE_KEYWORDS[i].toLowerCase())) {
-      // ただし、案件キーワードも含まれている場合は処理対象
-      let hasJobKeyword = false;
-      // 高重みキーワードをチェック
-      for (let j = 0; j < JOB_KEYWORDS.high.length; j++) {
-        if (text.includes(JOB_KEYWORDS.high[j].toLowerCase())) {
-          hasJobKeyword = true;
-          break;
-        }
-      }
-      if (!hasJobKeyword) {
-        return false;
-      }
-    }
-  }
-
-  // 人材キーワードの重みを計算（人材の可能性が高い場合はスキップ）
-  let talentScore = 0;
-  for (let i = 0; i < TALENT_KEYWORDS.high.length; i++) {
-    if (text.includes(TALENT_KEYWORDS.high[i].toLowerCase())) {
-      talentScore += 3; // 高重みは3点
-    }
-  }
-  for (let i = 0; i < TALENT_KEYWORDS.medium.length; i++) {
-    if (text.includes(TALENT_KEYWORDS.medium[i].toLowerCase())) {
-      talentScore += 2; // 中重みは2点
-    }
-  }
-  for (let i = 0; i < TALENT_KEYWORDS.low.length; i++) {
-    if (text.includes(TALENT_KEYWORDS.low[i].toLowerCase())) {
-      talentScore += 1; // 低重みは1点
-    }
-  }
-
-  // 人材の可能性が高い場合はスキップ
-  if (talentScore >= 3) {
-    return false;
-  }
-
-  // 案件キーワードの重みを計算
-  let jobScore = 0;
+  // JOB_KEYWORDS.highのいずれかが件名に含まれていればJobメール
   for (let i = 0; i < JOB_KEYWORDS.high.length; i++) {
-    if (text.includes(JOB_KEYWORDS.high[i].toLowerCase())) {
-      jobScore += 3; // 高重みは3点
-    }
-  }
-  for (let i = 0; i < JOB_KEYWORDS.medium.length; i++) {
-    if (text.includes(JOB_KEYWORDS.medium[i].toLowerCase())) {
-      jobScore += 2; // 中重みは2点
-    }
-  }
-  for (let i = 0; i < JOB_KEYWORDS.low.length; i++) {
-    if (text.includes(JOB_KEYWORDS.low[i].toLowerCase())) {
-      jobScore += 1; // 低重みは1点
+    if (subject.includes(JOB_KEYWORDS.high[i].toLowerCase())) {
+      return true;
     }
   }
 
-  // 案件の可能性が高い場合は処理対象
-  return jobScore >= 2;
+  return false;
 }
 
 /**
