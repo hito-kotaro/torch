@@ -16,117 +16,7 @@ var MAX_THREADS_TORCH = 200;
 var MAX_PROCESS_PER_RUN = 10; // 1回の実行で処理する最大メール数（現在は制限なしで全件処理）
 var API_CALL_DELAY_MS = 1000; // API呼び出し間の待機時間（ミリ秒）
 
-// 案件関連キーワード（事前フィルタリング用）
-// 重み: 高いほど案件の可能性が高い
-var JOB_KEYWORDS = {
-  // 高重みキーワード（案件の可能性が非常に高い）
-  high: [
-    "エンド直案件",
-    "エンド直",
-    "現場直案件",
-    "直案件",
-    "案件",
-    "単価変更",
-    "求人",
-    "プロジェクト",
-    "募集",
-    "業務委託",
-    "単価",
-    "万円",
-    "勤務地",
-    "勤務",
-    "契約",
-    "常駐",
-    "出社",
-    "体制再構築",
-  ],
-  // 中重みキーワード
-  medium: [
-    "開発",
-    "システム",
-    "SIer",
-    "SES",
-    "PM",
-    "SE",
-    "PG",
-    "フロントエンド",
-    "バックエンド",
-    "インフラ",
-    "運用",
-    "保守",
-    "運用保守",
-    "基本設計",
-    "詳細設計",
-  ],
-  // 低重みキーワード（技術名など、案件と人材の両方に出現）
-  low: [
-    "AWS",
-    "React",
-    "Vue",
-    "Java",
-    "Python",
-    "TypeScript",
-    "Go",
-    "PHP",
-    "Ruby",
-    "Node.js",
-    "Kotlin",
-    "Salesforce",
-    "M365",
-    "Entra",
-    "Intune",
-  ],
-};
-
-// 人材関連キーワード（人材メールの可能性が高い）
-var TALENT_KEYWORDS = {
-  // 高重みキーワード（人材の可能性が非常に高い）
-  high: [
-    "ご紹介",
-    "要員情報",
-    "要員",
-    "人材",
-    "個人事業主",
-    "技術者のご紹介",
-    "エンジニアのご紹介",
-    "候補",
-    "年齢",
-    "希望単価",
-    "希望",
-    "転職",
-    "フリーランス",
-  ],
-  // 中重みキーワード
-  medium: [
-    "ご提案",
-    "候補者",
-    "プロフィール",
-    "実績",
-    "スキル",
-    "経験",
-    "経歴",
-    "履歴書",
-    "レジュメ",
-  ],
-  // 低重みキーワード
-  low: ["ご連絡", "お問い合わせ", "ご検討"],
-};
-
-// 除外キーワード（明らかに案件でも人材でもないメール）
-var EXCLUDE_KEYWORDS = [
-  "会議",
-  "ミーティング",
-  "打ち合わせ",
-  "調整",
-  "お疲れ様",
-  "ご挨拶",
-  "お礼",
-  "ありがとう",
-  "失礼",
-  "お世話",
-  "ご連絡",
-  "ご報告",
-];
+// キーワード定義は削除（isJobMail関数内で直接定義）
 
 /**
  * メール自動処理トリガー（5分ごとに実行）
@@ -155,11 +45,7 @@ function processEmailsTrigger() {
     // JobメールとTalentメールを分類（件名のみで判定）
     const filteredMessages = [];
     let talentCount = 0; // Talentメールとして分類されたメール数
-    for (
-      let i = 0;
-      i < threads.length;
-      i++
-    ) {
+    for (let i = 0; i < threads.length; i++) {
       const thread = threads[i];
       const message = thread.getMessages()[0];
 
@@ -173,6 +59,9 @@ function processEmailsTrigger() {
 
       // 件名のみでJob/Talentを判定
       if (isJobMail(message)) {
+        console.log(
+          `メールID: ${message.getId()} はJobメールとして分類: ${message.getSubject()}`
+        );
         filteredMessages.push({ thread: thread, message: message });
       } else {
         console.log(
@@ -261,14 +150,38 @@ function processEmailsTrigger() {
 function isJobMail(message) {
   const subject = message.getSubject().toLowerCase();
 
-  // JOB_KEYWORDS.highのいずれかが件名に含まれていればJobメール
-  for (let i = 0; i < JOB_KEYWORDS.high.length; i++) {
-    if (subject.includes(JOB_KEYWORDS.high[i].toLowerCase())) {
+  // 指定されたキーワードのみをチェック（必ずJobMailとして扱う）
+  const jobKeywords = [
+    "エンド直案件",
+    "エンド直",
+    "現場直案件",
+    "直案件",
+    "案件",
+    "募集",
+  ];
+
+  // いずれかが件名に含まれていればJobメール
+  for (let i = 0; i < jobKeywords.length; i++) {
+    if (subject.includes(jobKeywords[i].toLowerCase())) {
       return true;
     }
   }
 
   return false;
+}
+
+/**
+ * Gmailラベルを取得または作成
+ * @param {string} labelName - ラベル名
+ * @returns {GmailLabel} ラベルオブジェクト
+ */
+function getOrCreateLabel(labelName) {
+  let label = GmailApp.getUserLabelByName(labelName);
+  if (!label) {
+    label = GmailApp.createLabel(labelName);
+    console.log(`ラベル "${labelName}" を作成しました。`);
+  }
+  return label;
 }
 
 /**
