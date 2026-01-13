@@ -173,6 +173,15 @@ function processEmailsTrigger() {
 function isJobMail(message) {
   const subject = message.getSubject().toLowerCase();
 
+  // 最優先: Talentキーワードが含まれている場合は必ずTalentメール
+  const talentKeywords = ["人材情報"];
+
+  for (let i = 0; i < talentKeywords.length; i++) {
+    if (subject.includes(talentKeywords[i].toLowerCase())) {
+      return false; // Talentメールとして扱う
+    }
+  }
+
   // 指定されたキーワードのみをチェック（必ずJobMailとして扱う）
   const jobKeywords = [
     "エンド直案件",
@@ -380,7 +389,11 @@ ${mailBody}
 1. このメールが案件情報（求人情報、プロジェクト募集、業務委託案件）を含む場合のみ、情報を抽出してください
 2. 人材情報（エンジニアの経歴書、スキルシート）の場合は、titleを空文字にしてください
 3. 営業メール、挨拶メール、会議調整などの場合も、titleを空文字にしてください
-4. 各項目は以下のルールに従って抽出してください：
+4. **summary（要約）の作成時は以下の点に特に注意してください**：
+   - 単価、金額、万円、円などの数値や金額に関する情報は絶対に含めないでください
+   - 技術要件（使用する技術、フレームワーク、ツールなど）を必ず含めてください
+   - 技術要件は要約せず、可能な限り元のメール本文の表現をそのまま残してください
+5. 各項目は以下のルールに従って抽出してください：
 
 ## 抽出ルール
 
@@ -400,6 +413,10 @@ ${mailBody}
   - 「550,000円」 → 55（10000で割る）
   - 「80万～100万」 → 100（上限）
 - **summary**: 案件概要（200字以内で要約）
+  - **絶対禁止**: 単価、金額、万円、円などの数値や金額に関する情報は一切含めないでください
+  - **必須**: 技術要件（使用する技術、フレームワーク、ツールなど）を必ず含めてください
+  - 技術要件は要約せず、可能な限り元のメール本文の表現をそのまま残してください（例: "React/TypeScript", "AWS Lambda", "PostgreSQL"など）
+  - 業務内容、開発環境、必要なスキルなどの技術的な情報を中心に要約してください
 - **description**: 詳細説明（業務内容、開発環境など）
 - **skills**: 必要なスキルの配列（例: ["React", "TypeScript", "AWS"]）
   - 技術名を正確に抽出し、以下の表記ルールに従って正規化してください
@@ -549,11 +566,15 @@ function sendToTorchTalentAPI(talentData) {
     if (responseCode === 200) {
       return JSON.parse(responseBody);
     } else {
-      console.error(`Torch APIエラー (${responseCode}): ${responseBody}`);
+      console.error(
+        `Torch Talent APIエラー (${responseCode}): ${responseBody}`
+      );
+      console.error(`リクエストURL: ${url}`);
+      console.error(`リクエストペイロード: ${JSON.stringify(talentData)}`);
       return { success: false, error: `API returned ${responseCode}` };
     }
   } catch (e) {
-    console.error("Torch API呼び出しエラー: " + e.toString());
+    console.error("Torch Talent API呼び出しエラー: " + e.toString());
     return { success: false, error: e.toString() };
   }
 }
