@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 type ImportTalentRequest = {
   originalTitle: string;
@@ -11,20 +11,22 @@ type ImportTalentRequest = {
 export async function POST(request: NextRequest) {
   try {
     // APIキー認証
-    const apiKey = request.headers.get('x-api-key');
+    const apiKey = request.headers.get("x-api-key");
     if (!apiKey || apiKey !== process.env.BATCH_API_KEY) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body: ImportTalentRequest = await request.json();
 
     // バリデーション
-    if (!body.originalTitle || !body.originalBody || !body.senderEmail || !body.receivedAt) {
+    if (
+      !body.originalTitle ||
+      !body.originalBody ||
+      !body.senderEmail ||
+      !body.receivedAt
+    ) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: "Missing required fields" },
         { status: 400 }
       );
     }
@@ -52,11 +54,10 @@ export async function POST(request: NextRequest) {
       success: true,
       talentId: talent.id,
     });
-
   } catch (error) {
-    console.error('Talent import error:', error);
+    console.error("Talent import error:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
