@@ -43,8 +43,8 @@ function processEmailsTrigger() {
     console.log(`${threads.length}件のメールスレッドが見つかりました。`);
 
     // JobメールとTalentメールを分類（件名のみで判定）
-    const filteredMessages = [];
-    let talentCount = 0; // Talentメールとして分類されたメール数
+    const jobMessages = [];
+    const talentMessages = [];
     for (let i = 0; i < threads.length; i++) {
       const thread = threads[i];
       const message = thread.getMessages()[0];
@@ -62,29 +62,27 @@ function processEmailsTrigger() {
         console.log(
           `メールID: ${message.getId()} はJobメールとして分類: ${message.getSubject()}`
         );
-        filteredMessages.push({ thread: thread, message: message });
+        jobMessages.push({ thread: thread, message: message });
       } else {
         console.log(
           `メールID: ${message.getId()} はTalentメールとして分類: ${message.getSubject()}`
         );
-        // Talentメールとして扱い、talentラベルを付与
-        const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
-        thread.addLabel(talentLabel);
-        thread.markRead();
-        talentCount++;
+        talentMessages.push({ thread: thread, message: message });
       }
     }
 
     console.log(
-      `Jobメール: ${filteredMessages.length}件, Talentメール: ${talentCount}件`
+      `Jobメール: ${jobMessages.length}件, Talentメール: ${talentMessages.length}件`
     );
 
-    let successCount = 0;
-    let skipCount = 0;
-    let errorCount = 0;
+    let jobSuccessCount = 0;
+    let jobErrorCount = 0;
+    let talentSuccessCount = 0;
+    let talentErrorCount = 0;
 
-    for (let i = 0; i < filteredMessages.length; i++) {
-      const { thread, message } = filteredMessages[i];
+    // Jobメールの処理（Gemini APIで解析してからTorch APIに送信）
+    for (let i = 0; i < jobMessages.length; i++) {
+      const { thread, message } = jobMessages[i];
 
       try {
         // API呼び出し間隔を制御（最初のリクエスト以外）
@@ -92,24 +90,17 @@ function processEmailsTrigger() {
           Utilities.sleep(API_CALL_DELAY_MS);
         }
 
-        const result = processSingleMail(message);
+        const result = processJobMail(message, thread);
 
         if (result === "success") {
-          successCount++;
+          jobSuccessCount++;
           markAsProcessed(message.getId());
-          // 案件メールに "eigyo@luxy-inc.com/job" ラベルを追加
+          // Jobメールに "eigyo@luxy-inc.com/job" ラベルを追加
           const jobLabel = getOrCreateLabel("eigyo@luxy-inc.com/job");
           thread.addLabel(jobLabel);
           thread.markRead();
-        } else if (result === "skip") {
-          skipCount++;
-          markAsProcessed(message.getId());
-          // 人材メールに "eigyo@luxy-inc.com/talent" ラベルを追加
-          const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
-          thread.addLabel(talentLabel);
-          thread.markRead();
         } else {
-          errorCount++;
+          jobErrorCount++;
         }
       } catch (e) {
         // レート制限エラーの場合は処理を中断
@@ -120,21 +111,53 @@ function processEmailsTrigger() {
         console.error(
           `スレッド(ID: ${thread.getId()})の処理中にエラー: ${e.toString()}`
         );
-        errorCount++;
+        jobErrorCount++;
+      }
+    }
+
+    // Talentメールの処理（Gemini APIを使わず、原文のみTorch APIに送信）
+    for (let i = 0; i < talentMessages.length; i++) {
+      const { thread, message } = talentMessages[i];
+
+      try {
+        // API呼び出し間隔を制御（最初のリクエスト以外）
+        if (i > 0) {
+          Utilities.sleep(API_CALL_DELAY_MS);
+        }
+
+        const result = processTalentMail(message, thread);
+
+        if (result === "success") {
+          talentSuccessCount++;
+          markAsProcessed(message.getId());
+          // Talentメールに "eigyo@luxy-inc.com/talent" ラベルを追加
+          const talentLabel = getOrCreateLabel("eigyo@luxy-inc.com/talent");
+          thread.addLabel(talentLabel);
+          thread.markRead();
+        } else {
+          talentErrorCount++;
+        }
+      } catch (e) {
+        console.error(
+          `スレッド(ID: ${thread.getId()})の処理中にエラー: ${e.toString()}`
+        );
+        talentErrorCount++;
       }
     }
 
     // 統計情報を出力
     const totalCount = threads.length;
-    const jobCount = successCount; // Jobメール数（成功したもの）
-    const totalTalentCount = talentCount + skipCount; // Talentメール数（件名判定 + Gemini解析で案件情報が見つからなかったもの）
+    const totalErrorCount = jobErrorCount + talentErrorCount;
 
     console.log("=== 処理結果統計 ===");
     console.log(`全体数: ${totalCount}件`);
-    console.log(`Jobメール数: ${jobCount}件（エラー: ${errorCount}件）`);
     console.log(
-      `Talentメール数: ${totalTalentCount}件（件名判定: ${talentCount}件, Gemini解析後: ${skipCount}件）`
+      `Jobメール数: ${jobSuccessCount}件（エラー: ${jobErrorCount}件）`
     );
+    console.log(
+      `Talentメール数: ${talentSuccessCount}件（エラー: ${talentErrorCount}件）`
+    );
+    console.log(`エラー数: ${totalErrorCount}件`);
   } catch (e) {
     console.error(
       "メール検索または処理ループ全体でエラーが発生しました: " + e.toString()
@@ -207,17 +230,19 @@ function markAsProcessed(messageId) {
 }
 
 /**
- * 個別メールを処理
- * @returns {string} 'success' | 'skip' | 'error'
+ * Jobメールを処理（Gemini APIで解析してからTorch APIに送信）
+ * @param {GmailMessage} message - Gmailメッセージオブジェクト
+ * @param {GmailThread} thread - Gmailスレッドオブジェクト（ラベル付け用）
+ * @returns {string} 'success' | 'error'
  */
-function processSingleMail(message) {
+function processJobMail(message, thread) {
   try {
     const mailBody = message.getPlainBody().replace(/(\r\n|\n|\r){2,}/g, "\n");
     if (!mailBody || mailBody.trim() === "") {
-      console.log(
-        `メールID: ${message.getId()} は本文が空のためスキップします。`
+      console.error(
+        `メールID: ${message.getId()} は本文が空のためエラーです。`
       );
-      return "skip";
+      return "error";
     }
 
     const from = message.getFrom();
@@ -250,12 +275,12 @@ function processSingleMail(message) {
       return "error";
     }
 
-    // 案件情報が見つからない場合はスキップ
+    // 案件情報が見つからない場合はエラー
     if (!jobData.title || jobData.title.trim() === "") {
-      console.log(
+      console.error(
         `メールID: ${message.getId()} からは案件情報が見つかりませんでした。`
       );
-      return "skip";
+      return "error";
     }
 
     // Torch APIに送信
@@ -277,6 +302,53 @@ function processSingleMail(message) {
     if (torchApiResult.success) {
       console.log(
         `案件を保存しました: ${jobData.title} (ID: ${torchApiResult.jobId})`
+      );
+      return "success";
+    } else {
+      console.error(`API送信エラー: ${torchApiResult.error}`);
+      return "error";
+    }
+  } catch (e) {
+    console.error(
+      `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`
+    );
+    return "error";
+  }
+}
+
+/**
+ * Talentメールを処理（Gemini APIを使わず、原文のみTorch APIに送信）
+ * @param {GmailMessage} message - Gmailメッセージオブジェクト
+ * @param {GmailThread} thread - Gmailスレッドオブジェクト（ラベル付け用）
+ * @returns {string} 'success' | 'error'
+ */
+function processTalentMail(message, thread) {
+  try {
+    const mailBody = message.getPlainBody().replace(/(\r\n|\n|\r){2,}/g, "\n");
+    if (!mailBody || mailBody.trim() === "") {
+      console.error(
+        `メールID: ${message.getId()} は本文が空のためエラーです。`
+      );
+      return "error";
+    }
+
+    const from = message.getFrom();
+    const subject = message.getSubject();
+    const mailDate = message.getDate();
+
+    console.log(`Talentメール処理開始: ${subject}`);
+
+    // Torch APIに原文のみ送信
+    const torchApiResult = sendToTorchTalentAPI({
+      originalTitle: subject,
+      originalBody: mailBody,
+      senderEmail: from,
+      receivedAt: mailDate.toISOString(),
+    });
+
+    if (torchApiResult.success) {
+      console.log(
+        `人材情報を保存しました: ${subject} (ID: ${torchApiResult.talentId})`
       );
       return "success";
     } else {
@@ -433,6 +505,39 @@ function sendToTorchAPI(jobData) {
       "X-API-Key": TORCH_API_KEY_CONFIG,
     },
     payload: JSON.stringify(jobData),
+    muteHttpExceptions: true,
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      return JSON.parse(responseBody);
+    } else {
+      console.error(`Torch APIエラー (${responseCode}): ${responseBody}`);
+      return { success: false, error: `API returned ${responseCode}` };
+    }
+  } catch (e) {
+    console.error("Torch API呼び出しエラー: " + e.toString());
+    return { success: false, error: e.toString() };
+  }
+}
+
+/**
+ * Torch APIに人材情報を送信（原文のみ）
+ */
+function sendToTorchTalentAPI(talentData) {
+  const url = `${TORCH_API_URL_CONFIG}/api/talents/import`;
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      "X-API-Key": TORCH_API_KEY_CONFIG,
+    },
+    payload: JSON.stringify(talentData),
     muteHttpExceptions: true,
   };
 
