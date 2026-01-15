@@ -16,7 +16,35 @@ var MAX_THREADS_TORCH = 200;
 var MAX_PROCESS_PER_RUN = 10; // 1回の実行で処理する最大メール数（現在は制限なしで全件処理）
 var API_CALL_DELAY_MS = 1000; // API呼び出し間の待機時間（ミリ秒）
 
-// キーワード定義は削除（isJobMail関数内で直接定義）
+/**
+ * キーワードを環境変数から取得（カンマ区切り）
+ * 環境変数が設定されていない場合はデフォルト値を使用
+ */
+function getJobKeywords() {
+  const envValue =
+    PropertiesService.getScriptProperties().getProperty("JOB_KEYWORDS");
+  if (envValue) {
+    return envValue
+      .split(",")
+      .map((kw) => kw.trim())
+      .filter((kw) => kw.length > 0);
+  }
+  // デフォルト値
+  return ["エンド直案件", "エンド直", "現場直案件", "直案件", "案件", "募集"];
+}
+
+function getTalentKeywords() {
+  const envValue =
+    PropertiesService.getScriptProperties().getProperty("TALENT_KEYWORDS");
+  if (envValue) {
+    return envValue
+      .split(",")
+      .map((kw) => kw.trim())
+      .filter((kw) => kw.length > 0);
+  }
+  // デフォルト値
+  return ["人材情報"];
+}
 
 /**
  * メール自動処理トリガー（5分ごとに実行）
@@ -174,7 +202,7 @@ function isJobMail(message) {
   const subject = message.getSubject().toLowerCase();
 
   // 最優先: Talentキーワードが含まれている場合は必ずTalentメール
-  const talentKeywords = ["人材情報"];
+  const talentKeywords = getTalentKeywords();
 
   for (let i = 0; i < talentKeywords.length; i++) {
     if (subject.includes(talentKeywords[i].toLowerCase())) {
@@ -183,14 +211,7 @@ function isJobMail(message) {
   }
 
   // 指定されたキーワードのみをチェック（必ずJobMailとして扱う）
-  const jobKeywords = [
-    "エンド直案件",
-    "エンド直",
-    "現場直案件",
-    "直案件",
-    "案件",
-    "募集",
-  ];
+  const jobKeywords = getJobKeywords();
 
   // いずれかが件名に含まれていればJobメール
   for (let i = 0; i < jobKeywords.length; i++) {
@@ -236,6 +257,53 @@ function markAsProcessed(messageId) {
   const key = "processed_" + messageId;
   // 7日間キャッシュ（最大6時間なので、複数回に分けて保存）
   cache.put(key, "1", 21600); // 6時間
+}
+
+/**
+ * 金額表現を伏せ字にするユーティリティ
+ * 一般ユーザー向けの表示テキストから、金額に関する情報をシステマチックに除去する
+ * @param {string} text
+ * @returns {string}
+ */
+function maskAmountExpressions(text) {
+  if (!text) return text;
+
+  let result = text;
+
+  // 全角数字を半角に一旦揃える（簡易対応）
+  const z2hMap = {
+    "０": "0",
+    "１": "1",
+    "２": "2",
+    "３": "3",
+    "４": "4",
+    "５": "5",
+    "６": "6",
+    "７": "7",
+    "８": "8",
+    "９": "9",
+  };
+  result = result.replace(/[０-９]/g, function (ch) {
+    return z2hMap[ch] || ch;
+  });
+
+  // 例: 「70万円」「80万」「100円」「550,000円」
+  result = result.replace(/\d{1,3}(,\d{3})+(円)?/g, "［金額非表示］");
+  result = result.replace(/\d+(\.\d+)?\s*(万|万円|円)/g, "［金額非表示］");
+
+  // 例: 「60~70万」「80万～100万」
+  result = result.replace(
+    /\d+\s*[~〜－\-]\s*\d+\s*(万|万円|円)?/g,
+    "［金額非表示］"
+  );
+
+  // 「単価」「月単価」「報酬」など金額ワードとセットになっている数値
+  result = result.replace(
+    /(単価|月単価|報酬|給与|年収)[^0-9]{0,10}\d+(\.\d+)?\s*(万|万円|円)?/g,
+    "$1：［金額非表示］"
+  );
+
+  return result;
 }
 
 /**
@@ -292,6 +360,12 @@ function processJobMail(message, thread) {
       return "error";
     }
 
+    // summary / description から金額表現をシステマチックに除去（最終防衛ライン）
+    const sanitizedSummary = maskAmountExpressions(jobData.summary || "");
+    const sanitizedDescription = maskAmountExpressions(
+      jobData.description || ""
+    );
+
     // Torch APIに送信
     const torchApiResult = sendToTorchAPI({
       title: jobData.title,
@@ -299,8 +373,8 @@ function processJobMail(message, thread) {
       grade: jobData.grade,
       location: jobData.location,
       unitPrice: jobData.unitPrice,
-      summary: jobData.summary,
-      description: jobData.description,
+      summary: sanitizedSummary,
+      description: sanitizedDescription,
       originalTitle: subject,
       originalBody: mailBody,
       senderEmail: from,
@@ -379,6 +453,13 @@ function createJobExtractionPrompt(mailBody, subject) {
   return `
 以下のメール本文から、案件情報を抽出してJSON形式で出力してください。
 
+【重要警告：金額情報の完全排除】
+summary（要約）とdescription（詳細説明）には、以下の金額関連情報を絶対に含めないでください：
+- 単価、金額、万円、円、給与、報酬、予算などの数値や金額表現
+- 例: 「70万円」「60~70万」「550,000円」「80万～100万」などの記述は完全に削除
+- 金額に関する言及や暗示も一切含めないでください
+- 一般ユーザーが閲覧する情報なので、金額に関する情報が一切出ないようにしてください
+
 【メール件名】
 ${subject}
 
@@ -389,9 +470,11 @@ ${mailBody}
 1. このメールが案件情報（求人情報、プロジェクト募集、業務委託案件）を含む場合のみ、情報を抽出してください
 2. 人材情報（エンジニアの経歴書、スキルシート）の場合は、titleを空文字にしてください
 3. 営業メール、挨拶メール、会議調整などの場合も、titleを空文字にしてください
-4. **summary（要約）の作成時は以下の点に特に注意してください**：
-   - 単価、金額、万円、円などの数値や金額に関する情報は絶対に含めないでください
-   - 技術要件（使用する技術、フレームワーク、ツールなど）を必ず含めてください
+4. **summary（要約）とdescription（詳細説明）の作成時の最重要ルール**：
+   - **厳格禁止**: 単価、金額、万円、円、給与、報酬、予算などの数値や金額に関する情報は一切含めないでください
+   - 金額に関する記述がメール本文にあっても、summaryとdescriptionからは完全に除外してください
+   - 一般ユーザーが閲覧できる情報（summary、description）には金額に関する情報が一切出ないようにしてください
+   - **必須**: 技術要件（使用する技術、フレームワーク、ツールなど）を必ず含めてください
    - 技術要件は要約せず、可能な限り元のメール本文の表現をそのまま残してください
 5. 各項目は以下のルールに従って抽出してください：
 
@@ -413,11 +496,18 @@ ${mailBody}
   - 「550,000円」 → 55（10000で割る）
   - 「80万～100万」 → 100（上限）
 - **summary**: 案件概要（200字以内で要約）
-  - **絶対禁止**: 単価、金額、万円、円などの数値や金額に関する情報は一切含めないでください
+  - **厳格禁止**: 単価、金額、万円、円、給与、報酬、予算などの数値や金額に関する情報は一切含めないでください
+  - メール本文に金額情報があっても、summaryからは完全に除外してください
   - **必須**: 技術要件（使用する技術、フレームワーク、ツールなど）を必ず含めてください
   - 技術要件は要約せず、可能な限り元のメール本文の表現をそのまま残してください（例: "React/TypeScript", "AWS Lambda", "PostgreSQL"など）
   - 業務内容、開発環境、必要なスキルなどの技術的な情報を中心に要約してください
+  - **出力前に必ず確認**: summaryに金額関連の記述が含まれていないか最終チェックしてください
 - **description**: 詳細説明（業務内容、開発環境など）
+  - **厳格禁止**: 単価、金額、万円、円、給与、報酬、予算などの数値や金額に関する情報は一切含めないでください
+  - メール本文に金額情報があっても、descriptionからは完全に除外してください
+  - 一般ユーザーが閲覧できる情報なので、金額に関する情報が一切出ないようにしてください
+  - 業務内容、開発環境、必要なスキル、技術要件などの技術的な情報を詳細に記載してください
+  - **出力前に必ず確認**: descriptionに金額関連の記述が含まれていないか最終チェックしてください
 - **skills**: 必要なスキルの配列（例: ["React", "TypeScript", "AWS"]）
   - 技術名を正確に抽出し、以下の表記ルールに従って正規化してください
   - 大文字小文字: .NET, JavaScript, TypeScript, MySQL, PostgreSQL, GitHub, Git, Linux
@@ -445,6 +535,12 @@ ${mailBody}
 \`\`\`
 
 ※注意: gradeは必須項目です。nullは不可。
+
+【最終チェック】
+JSONを出力する前に、以下を必ず確認してください：
+1. summaryに金額関連の記述（単価、万円、円、給与、報酬など）が含まれていないか
+2. descriptionに金額関連の記述（単価、万円、円、給与、報酬など）が含まれていないか
+3. 金額関連の記述が含まれている場合は、その部分を完全に削除してから出力してください
 `;
 }
 
