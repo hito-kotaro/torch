@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { getUserRole } from '@/lib/auth';
+import { getUserRole, isAdmin } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import TalentsClient from './TalentsClient';
 
 async function getTalents(isAdmin: boolean) {
@@ -35,9 +36,15 @@ async function getTalents(isAdmin: boolean) {
 }
 
 export default async function TalentsPage() {
+  const userIsAdmin = await isAdmin();
+
+  // 管理者でない場合は案件一覧にリダイレクト
+  if (!userIsAdmin) {
+    redirect('/jobs');
+  }
+
   const userRole = await getUserRole();
-  const isAdmin = userRole === 'admin';
-  const talents = await getTalents(isAdmin);
+  const talents = await getTalents(userIsAdmin);
 
   return <TalentsClient talents={talents} userRole={userRole} />;
 }
