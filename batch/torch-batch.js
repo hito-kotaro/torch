@@ -10,11 +10,18 @@ var TORCH_API_URL_CONFIG =
 var TORCH_API_KEY_CONFIG =
   PropertiesService.getScriptProperties().getProperty("TORCH_API_KEY");
 
-// 設定
-var TARGET_EMAIL_TORCH = "eigyo@luxy-inc.com";
-var MAX_THREADS_TORCH = 200;
-var MAX_PROCESS_PER_RUN = 10; // 1回の実行で処理する最大メール数（現在は制限なしで全件処理）
-var API_CALL_DELAY_MS = 1000; // API呼び出し間の待機時間（ミリ秒）
+// 設定（スクリプトプロパティから取得、未設定の場合はデフォルト値を使用）
+var TARGET_EMAIL_TORCH =
+  PropertiesService.getScriptProperties().getProperty("TARGET_EMAIL_TORCH") ||
+  "eigyo@luxy-inc.com";
+var MAX_THREADS_TORCH =
+  parseInt(
+    PropertiesService.getScriptProperties().getProperty("MAX_THREADS_TORCH")
+  ) || 200;
+var API_CALL_DELAY_MS =
+  parseInt(
+    PropertiesService.getScriptProperties().getProperty("API_CALL_DELAY_MS")
+  ) || 1000; // API呼び出し間の待機時間（ミリ秒）
 
 /**
  * キーワードを環境変数から取得（カンマ区切り）
@@ -54,6 +61,15 @@ function processEmailsTrigger() {
     console.error("必要な環境変数が設定されていません。");
     return;
   }
+
+  // スクリプトプロパティの設定を表示
+  console.log("=== スクリプトプロパティ設定 ===");
+  console.log(`TARGET_EMAIL_TORCH: ${TARGET_EMAIL_TORCH}`);
+  console.log(`MAX_THREADS_TORCH: ${MAX_THREADS_TORCH}`);
+  console.log(`API_CALL_DELAY_MS: ${API_CALL_DELAY_MS}ms`);
+  console.log(`JOB_KEYWORDS: ${getJobKeywords().join(", ")}`);
+  console.log(`TALENT_KEYWORDS: ${getTalentKeywords().join(", ")}`);
+  console.log("================================");
 
   // 前日の日付を取得
   const yesterday = new Date();
@@ -344,53 +360,84 @@ function processJobMail(message, thread) {
       return "error";
     }
 
-    let jobData;
+    let parsedData;
     try {
-      jobData = JSON.parse(apiResult.data);
+      parsedData = JSON.parse(apiResult.data);
     } catch (e) {
       console.error(`JSONパースエラー: ${apiResult.data}`);
       return "error";
     }
 
-    // 案件情報が見つからない場合はエラー
-    if (!jobData.title || jobData.title.trim() === "") {
+    // 配列形式の場合は配列に変換、単一オブジェクトの場合は配列に変換
+    const jobDataArray = Array.isArray(parsedData) ? parsedData : [parsedData];
+
+    if (jobDataArray.length === 0) {
       console.error(
         `メールID: ${message.getId()} からは案件情報が見つかりませんでした。`
       );
       return "error";
     }
 
-    // summary / description から金額表現をシステマチックに除去（最終防衛ライン）
-    const sanitizedSummary = maskAmountExpressions(jobData.summary || "");
-    const sanitizedDescription = maskAmountExpressions(
-      jobData.description || ""
-    );
+    let successCount = 0;
+    let errorCount = 0;
 
-    // Torch APIに送信
-    const torchApiResult = sendToTorchAPI({
-      title: jobData.title,
-      company: jobData.company,
-      grade: jobData.grade,
-      location: jobData.location,
-      unitPrice: jobData.unitPrice,
-      summary: sanitizedSummary,
-      description: sanitizedDescription,
-      originalTitle: subject,
-      originalBody: mailBody,
-      senderEmail: from,
-      receivedAt: mailDate.toISOString(),
-      skills: jobData.skills || [],
-    });
+    // 各案件を処理
+    for (let i = 0; i < jobDataArray.length; i++) {
+      const jobData = jobDataArray[i];
 
-    if (torchApiResult.success) {
-      console.log(
-        `案件を保存しました: ${jobData.title} (ID: ${torchApiResult.jobId})`
+      // 案件情報が見つからない場合はスキップ
+      if (!jobData.title || jobData.title.trim() === "") {
+        console.log(
+          `メールID: ${message.getId()} の${
+            i + 1
+          }件目の案件はタイトルが空のためスキップします。`
+        );
+        errorCount++;
+        continue;
+      }
+
+      // summary / description から金額表現をシステマチックに除去（最終防衛ライン）
+      const sanitizedSummary = maskAmountExpressions(jobData.summary || "");
+      const sanitizedDescription = maskAmountExpressions(
+        jobData.description || ""
       );
-      return "success";
-    } else {
-      console.error(`API送信エラー: ${torchApiResult.error}`);
+
+      // Torch APIに送信
+      const torchApiResult = sendToTorchAPI({
+        title: jobData.title,
+        company: jobData.company,
+        grade: jobData.grade,
+        location: jobData.location,
+        unitPrice: jobData.unitPrice,
+        summary: sanitizedSummary,
+        description: sanitizedDescription,
+        originalTitle: subject,
+        originalBody: mailBody,
+        senderEmail: from,
+        receivedAt: mailDate.toISOString(),
+        skills: jobData.skills || [],
+      });
+
+      if (torchApiResult.success) {
+        console.log(
+          `案件を保存しました: ${jobData.title} (ID: ${torchApiResult.jobId})`
+        );
+        successCount++;
+      } else {
+        console.error(
+          `案件の保存に失敗しました: ${jobData.title} - ${torchApiResult.error}`
+        );
+        errorCount++;
+      }
+    }
+
+    // すべての案件がエラーの場合はエラーを返す
+    if (successCount === 0) {
       return "error";
     }
+
+    // 1件以上成功した場合は成功を返す
+    return "success";
   } catch (e) {
     console.error(
       `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`
@@ -521,6 +568,10 @@ ${mailBody}
 【出力形式】
 必ず以下のJSON形式で、\`\`\`json ... \`\`\` のブロックで返却してください。
 
+1つのメールに複数の案件が含まれている場合は、配列形式で返してください。
+1つの案件のみの場合は、単一のオブジェクト形式で返してください。
+
+**単一案件の場合:**
 \`\`\`json
 {
   "title": "",
@@ -532,6 +583,32 @@ ${mailBody}
   "description": "",
   "skills": []
 }
+\`\`\`
+
+**複数案件の場合:**
+\`\`\`json
+[
+  {
+    "title": "",
+    "company": "",
+    "grade": "SE",
+    "location": "",
+    "unitPrice": null,
+    "summary": "",
+    "description": "",
+    "skills": []
+  },
+  {
+    "title": "",
+    "company": "",
+    "grade": "SE",
+    "location": "",
+    "unitPrice": null,
+    "summary": "",
+    "description": "",
+    "skills": []
+  }
+]
 \`\`\`
 
 ※注意: gradeは必須項目です。nullは不可。
