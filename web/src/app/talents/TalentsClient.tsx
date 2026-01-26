@@ -50,16 +50,11 @@ export default function TalentsClient({ talents, userRole }: TalentsClientProps)
 
   const filteredAndSortedTalents = useMemo(() => {
     const result = talents.filter((talent) => {
-      // キーワード検索
+      // キーワード検索（メール本文で検索）
       const matchesSearch =
         searchQuery === "" ||
-        talent.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        talent.summary?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        talent.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        talent.position?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        talent.skills.some((skill) =>
-          skill.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        (talent.originalBody &&
+          talent.originalBody.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // 着信日フィルター
       let matchesDate = true;

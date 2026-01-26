@@ -28,7 +28,7 @@ async function getTalents(isAdmin: boolean) {
     summary: talent.summary,
     description: talent.description,
     originalTitle: isAdmin ? talent.originalTitle : null, // 管理者のみ原文タイトルを返す
-    originalBody: isAdmin ? talent.originalBody : null, // 管理者のみ原文本文を返す
+    originalBody: talent.originalBody, // 検索用に常に返す（管理者のみアクセス可能なページなので）
     senderEmail: isAdmin ? talent.senderEmail : null, // 管理者のみ送信者メールを返す
     receivedAt: talent.receivedAt,
     skills: talent.skills.map((ts) => ts.skill.name),
