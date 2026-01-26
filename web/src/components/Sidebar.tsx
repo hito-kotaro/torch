@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 type MenuItem = {
   id: string;
@@ -12,10 +12,22 @@ type MenuItem = {
 };
 
 const menuItems: MenuItem[] = [
-  { id: 'jobs', label: '案件一覧', icon: '📋', href: '/jobs' },
-  { id: 'talents', label: 'タレント一覧', icon: '👤', href: '/talents', adminOnly: true },
-  { id: 'analytics', label: '案件分析', icon: '📊', href: '/analytics' },
-  { id: 'register', label: '手動登録', icon: '✏️', href: '/jobs/register', adminOnly: true },
+  { id: "jobs", label: "案件一覧", icon: "📋", href: "/jobs" },
+  {
+    id: "talents",
+    label: "タレント一覧",
+    icon: "👤",
+    href: "/talents",
+    adminOnly: true,
+  },
+  { id: "analytics", label: "案件分析", icon: "📊", href: "/analytics" },
+  {
+    id: "register",
+    label: "手動登録",
+    icon: "✏️",
+    href: "/jobs/register",
+    adminOnly: true,
+  },
 ];
 
 type SidebarProps = {
@@ -26,7 +38,7 @@ export default function Sidebar({ isAdmin }: SidebarProps) {
   const pathname = usePathname();
 
   const visibleMenuItems = menuItems.filter(
-    (item) => !item.adminOnly || isAdmin
+    (item) => !item.adminOnly || isAdmin,
   );
 
   return (
@@ -38,8 +50,8 @@ export default function Sidebar({ isAdmin }: SidebarProps) {
             href={item.href}
             className={`block w-full text-left px-4 py-2 rounded-lg transition-colors ${
               pathname === item.href
-                ? 'bg-blue-500 text-white'
-                : 'text-gray-700 hover:bg-gray-200'
+                ? "bg-blue-500 text-white"
+                : "text-gray-700 hover:bg-gray-200"
             }`}
           >
             <span className="mr-2">{item.icon}</span>
