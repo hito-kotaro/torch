@@ -16,11 +16,11 @@ var TARGET_EMAIL_TORCH =
   "eigyo@luxy-inc.com";
 var MAX_THREADS_TORCH =
   parseInt(
-    PropertiesService.getScriptProperties().getProperty("MAX_THREADS_TORCH")
+    PropertiesService.getScriptProperties().getProperty("MAX_THREADS_TORCH"),
   ) || 200;
 var API_CALL_DELAY_MS =
   parseInt(
-    PropertiesService.getScriptProperties().getProperty("API_CALL_DELAY_MS")
+    PropertiesService.getScriptProperties().getProperty("API_CALL_DELAY_MS"),
   ) || 1000; // API呼び出し間の待機時間（ミリ秒）
 
 /**
@@ -96,7 +96,7 @@ function processEmailsTrigger() {
       // 重複チェック: 既に処理済みのメールIDをスキップ
       if (isAlreadyProcessed(message.getId())) {
         console.log(
-          `メールID: ${message.getId()} は既に処理済みのためスキップします。`
+          `メールID: ${message.getId()} は既に処理済みのためスキップします。`,
         );
         continue;
       }
@@ -104,19 +104,19 @@ function processEmailsTrigger() {
       // 件名のみでJob/Talentを判定
       if (isJobMail(message)) {
         console.log(
-          `メールID: ${message.getId()} はJobメールとして分類: ${message.getSubject()}`
+          `メールID: ${message.getId()} はJobメールとして分類: ${message.getSubject()}`,
         );
         jobMessages.push({ thread: thread, message: message });
       } else {
         console.log(
-          `メールID: ${message.getId()} はTalentメールとして分類: ${message.getSubject()}`
+          `メールID: ${message.getId()} はTalentメールとして分類: ${message.getSubject()}`,
         );
         talentMessages.push({ thread: thread, message: message });
       }
     }
 
     console.log(
-      `Jobメール: ${jobMessages.length}件, Talentメール: ${talentMessages.length}件`
+      `Jobメール: ${jobMessages.length}件, Talentメール: ${talentMessages.length}件`,
     );
 
     let jobSuccessCount = 0;
@@ -153,7 +153,7 @@ function processEmailsTrigger() {
           break;
         }
         console.error(
-          `スレッド(ID: ${thread.getId()})の処理中にエラー: ${e.toString()}`
+          `スレッド(ID: ${thread.getId()})の処理中にエラー: ${e.toString()}`,
         );
         jobErrorCount++;
       }
@@ -183,7 +183,7 @@ function processEmailsTrigger() {
         }
       } catch (e) {
         console.error(
-          `スレッド(ID: ${thread.getId()})の処理中にエラー: ${e.toString()}`
+          `スレッド(ID: ${thread.getId()})の処理中にエラー: ${e.toString()}`,
         );
         talentErrorCount++;
       }
@@ -196,15 +196,15 @@ function processEmailsTrigger() {
     console.log("=== 処理結果統計 ===");
     console.log(`全体数: ${totalCount}件`);
     console.log(
-      `Jobメール数: ${jobSuccessCount}件（エラー: ${jobErrorCount}件）`
+      `Jobメール数: ${jobSuccessCount}件（エラー: ${jobErrorCount}件）`,
     );
     console.log(
-      `Talentメール数: ${talentSuccessCount}件（エラー: ${talentErrorCount}件）`
+      `Talentメール数: ${talentSuccessCount}件（エラー: ${talentErrorCount}件）`,
     );
     console.log(`エラー数: ${totalErrorCount}件`);
   } catch (e) {
     console.error(
-      "メール検索または処理ループ全体でエラーが発生しました: " + e.toString()
+      "メール検索または処理ループ全体でエラーが発生しました: " + e.toString(),
     );
   }
 }
@@ -310,13 +310,13 @@ function maskAmountExpressions(text) {
   // 例: 「60~70万」「80万～100万」
   result = result.replace(
     /\d+\s*[~〜－\-]\s*\d+\s*(万|万円|円)?/g,
-    "［金額非表示］"
+    "［金額非表示］",
   );
 
   // 「単価」「月単価」「報酬」など金額ワードとセットになっている数値
   result = result.replace(
     /(単価|月単価|報酬|給与|年収)[^0-9]{0,10}\d+(\.\d+)?\s*(万|万円|円)?/g,
-    "$1：［金額非表示］"
+    "$1：［金額非表示］",
   );
 
   return result;
@@ -333,7 +333,7 @@ function processJobMail(message, thread) {
     const mailBody = message.getPlainBody().replace(/(\r\n|\n|\r){2,}/g, "\n");
     if (!mailBody || mailBody.trim() === "") {
       console.error(
-        `メールID: ${message.getId()} は本文が空のためエラーです。`
+        `メールID: ${message.getId()} は本文が空のためエラーです。`,
       );
       return "error";
     }
@@ -351,7 +351,7 @@ function processJobMail(message, thread) {
     if (!apiResult.success) {
       if (apiResult.isRateLimited) {
         console.error(
-          `メールID: ${message.getId()} のAI解析がレート制限により失敗しました。処理を中断します。`
+          `メールID: ${message.getId()} のAI解析がレート制限により失敗しました。処理を中断します。`,
         );
         // レート制限の場合は特別なエラーコードを返す
         throw new Error("RATE_LIMIT_EXCEEDED");
@@ -373,7 +373,7 @@ function processJobMail(message, thread) {
 
     if (jobDataArray.length === 0) {
       console.error(
-        `メールID: ${message.getId()} からは案件情報が見つかりませんでした。`
+        `メールID: ${message.getId()} からは案件情報が見つかりませんでした。`,
       );
       return "error";
     }
@@ -390,7 +390,7 @@ function processJobMail(message, thread) {
         console.log(
           `メールID: ${message.getId()} の${
             i + 1
-          }件目の案件はタイトルが空のためスキップします。`
+          }件目の案件はタイトルが空のためスキップします。`,
         );
         errorCount++;
         continue;
@@ -399,7 +399,7 @@ function processJobMail(message, thread) {
       // summary / description から金額表現をシステマチックに除去（最終防衛ライン）
       const sanitizedSummary = maskAmountExpressions(jobData.summary || "");
       const sanitizedDescription = maskAmountExpressions(
-        jobData.description || ""
+        jobData.description || "",
       );
 
       // Torch APIに送信
@@ -420,12 +420,12 @@ function processJobMail(message, thread) {
 
       if (torchApiResult.success) {
         console.log(
-          `案件を保存しました: ${jobData.title} (ID: ${torchApiResult.jobId})`
+          `案件を保存しました: ${jobData.title} (ID: ${torchApiResult.jobId})`,
         );
         successCount++;
       } else {
         console.error(
-          `案件の保存に失敗しました: ${jobData.title} - ${torchApiResult.error}`
+          `案件の保存に失敗しました: ${jobData.title} - ${torchApiResult.error}`,
         );
         errorCount++;
       }
@@ -440,7 +440,7 @@ function processJobMail(message, thread) {
     return "success";
   } catch (e) {
     console.error(
-      `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`
+      `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`,
     );
     return "error";
   }
@@ -457,7 +457,7 @@ function processTalentMail(message, thread) {
     const mailBody = message.getPlainBody().replace(/(\r\n|\n|\r){2,}/g, "\n");
     if (!mailBody || mailBody.trim() === "") {
       console.error(
-        `メールID: ${message.getId()} は本文が空のためエラーです。`
+        `メールID: ${message.getId()} は本文が空のためエラーです。`,
       );
       return "error";
     }
@@ -478,7 +478,7 @@ function processTalentMail(message, thread) {
 
     if (torchApiResult.success) {
       console.log(
-        `人材情報を保存しました: ${subject} (ID: ${torchApiResult.talentId})`
+        `人材情報を保存しました: ${subject} (ID: ${torchApiResult.talentId})`,
       );
       return "success";
     } else {
@@ -487,7 +487,7 @@ function processTalentMail(message, thread) {
     }
   } catch (e) {
     console.error(
-      `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`
+      `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`,
     );
     return "error";
   }
@@ -740,7 +740,7 @@ function sendToTorchTalentAPI(talentData) {
       return JSON.parse(responseBody);
     } else {
       console.error(
-        `Torch Talent APIエラー (${responseCode}): ${responseBody}`
+        `Torch Talent APIエラー (${responseCode}): ${responseBody}`,
       );
       console.error(`リクエストURL: ${url}`);
       console.error(`リクエストペイロード: ${JSON.stringify(talentData)}`);
