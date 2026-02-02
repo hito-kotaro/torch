@@ -8,6 +8,7 @@ type ImportJobRequest = {
   grade?: string;
   location?: string;
   unitPrice?: number;
+  recruitmentCount?: number; // 募集人数（2人以上の場合は「募集人数2人以上」タグを付与）
   summary?: string;
   description?: string;
   originalTitle: string;
@@ -38,6 +39,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 募集人数が2人以上の場合は「募集人数2人以上」タグをスキルに追加
+    const skillsToLink = body.skills ? [...body.skills] : [];
+    const recruitmentCount = body.recruitmentCount != null ? Number(body.recruitmentCount) : null;
+    if (recruitmentCount !== null && !Number.isNaN(recruitmentCount) && recruitmentCount >= 2) {
+      const tag = '募集人数2人以上';
+      if (!skillsToLink.includes(tag)) {
+        skillsToLink.push(tag);
+      }
+    }
+
     // Jobを作成
     const job = await prisma.job.create({
       data: {
@@ -46,6 +57,7 @@ export async function POST(request: NextRequest) {
         grade: body.grade || null,
         location: body.location || null,
         unitPrice: body.unitPrice || null,
+        recruitmentCount: recruitmentCount != null && !Number.isNaN(recruitmentCount) ? recruitmentCount : null,
         summary: body.summary || null,
         description: body.description || null,
         originalTitle: body.originalTitle,
@@ -56,9 +68,9 @@ export async function POST(request: NextRequest) {
     });
 
     // スキルを関連付け
-    if (body.skills && body.skills.length > 0) {
+    if (skillsToLink.length > 0) {
       // スキル名を正規化（重複排除含む）
-      const normalizedSkills = normalizeSkillNames(body.skills);
+      const normalizedSkills = normalizeSkillNames(skillsToLink);
 
       for (const skillName of normalizedSkills) {
         // スキルを取得または作成
