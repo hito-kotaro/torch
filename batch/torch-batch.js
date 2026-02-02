@@ -402,6 +402,23 @@ function processJobMail(message, thread) {
         jobData.description || ""
       );
 
+      // 募集人数が2人以上の場合は「募集人数2人以上」タグをスキルに追加
+      const skills = jobData.skills ? [...jobData.skills] : [];
+      const recruitmentCount =
+        jobData.recruitmentCount != null
+          ? parseInt(jobData.recruitmentCount, 10)
+          : null;
+      if (
+        recruitmentCount !== null &&
+        !isNaN(recruitmentCount) &&
+        recruitmentCount >= 2
+      ) {
+        const tag = "募集人数2人以上";
+        if (!skills.includes(tag)) {
+          skills.push(tag);
+        }
+      }
+
       // Torch APIに送信
       const torchApiResult = sendToTorchAPI({
         title: jobData.title,
@@ -409,13 +426,17 @@ function processJobMail(message, thread) {
         grade: jobData.grade,
         location: jobData.location,
         unitPrice: jobData.unitPrice,
+        recruitmentCount:
+          recruitmentCount !== null && !isNaN(recruitmentCount)
+            ? recruitmentCount
+            : null,
         summary: sanitizedSummary,
         description: sanitizedDescription,
         originalTitle: subject,
         originalBody: mailBody,
         senderEmail: from,
         receivedAt: mailDate.toISOString(),
-        skills: jobData.skills || [],
+        skills: skills,
       });
 
       if (torchApiResult.success) {
@@ -542,6 +563,7 @@ ${mailBody}
   - 「60~70万」 → 60（下限）
   - 「550,000円」 → 55（10000で割る）
   - 「80万～100万」 → 100（上限）
+- **recruitmentCount**: 募集人数（数値のみ。メール本文に「2名」「3人」などと書かれている場合はその数値。不明または記載がない場合はnull）
 - **summary**: 案件概要（200字以内で要約）
   - **厳格禁止**: 単価、金額、万円、円、給与、報酬、予算などの数値や金額に関する情報は一切含めないでください
   - メール本文に金額情報があっても、summaryからは完全に除外してください
@@ -579,6 +601,7 @@ ${mailBody}
   "grade": "SE",
   "location": "",
   "unitPrice": null,
+  "recruitmentCount": null,
   "summary": "",
   "description": "",
   "skills": []
@@ -594,6 +617,7 @@ ${mailBody}
     "grade": "SE",
     "location": "",
     "unitPrice": null,
+    "recruitmentCount": null,
     "summary": "",
     "description": "",
     "skills": []
@@ -604,6 +628,7 @@ ${mailBody}
     "grade": "SE",
     "location": "",
     "unitPrice": null,
+    "recruitmentCount": null,
     "summary": "",
     "description": "",
     "skills": []

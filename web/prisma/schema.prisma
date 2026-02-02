@@ -20,6 +20,7 @@ model Job {
   grade       String?  // グレード（S1, S2, S3, S4, S5, SS, MG）
   location    String?  // 勤務地
   unitPrice   Int?     // 単価（月額、単位：円）
+  recruitmentCount Int? // 募集人数（2人以上の場合は「募集人数2人以上」タグを付与）
   summary     String?  @db.Text // 案件概要
   description String?  @db.Text // 詳細説明
 

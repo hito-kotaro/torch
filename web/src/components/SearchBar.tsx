@@ -29,6 +29,7 @@ const availableSkills = [
   { value: "Java", label: "Java" },
   { value: "C#", label: "C#" },
   { value: "SAP", label: "SAP" },
+  { value: "募集人数2人以上", label: "募集人数2人以上" },
 ];
 
 export default function SearchBar({
