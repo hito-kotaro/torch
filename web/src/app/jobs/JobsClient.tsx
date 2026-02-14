@@ -209,7 +209,12 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
             <div className="flex flex-col h-full">
               <div className="sticky top-0 bg-white z-10 p-6 pb-4 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-gray-900">案件一覧</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    案件一覧
+                    <span className="text-sm font-normal text-gray-500 ml-2">
+                      （直近20日分）
+                    </span>
+                  </h2>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">
                       {filteredAndSortedJobs.length}件

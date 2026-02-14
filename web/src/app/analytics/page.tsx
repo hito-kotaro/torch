@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { PrismaClient } from '@prisma/client';
 import AnalyticsClient from './AnalyticsClient';
 import { getUserRole } from '@/lib/auth';
+import { getListingSince } from '@/lib/listingLimit';
 
 const prisma = new PrismaClient();
 
@@ -15,8 +16,11 @@ export default async function AnalyticsPage() {
 
   const userRole = await getUserRole();
 
-  // 案件情報を取得
+  // 案件情報を取得（直近20日分）
   const jobs = await prisma.job.findMany({
+    where: {
+      receivedAt: { gte: getListingSince() },
+    },
     include: {
       skills: {
         include: {

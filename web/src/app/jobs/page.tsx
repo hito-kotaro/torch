@@ -1,9 +1,13 @@
 import { prisma } from '@/lib/prisma';
 import { getUserRole } from '@/lib/auth';
+import { getListingSince } from '@/lib/listingLimit';
 import JobsClient from './JobsClient';
 
 async function getJobs(isAdmin: boolean) {
   const jobs = await prisma.job.findMany({
+    where: {
+      receivedAt: { gte: getListingSince() },
+    },
     include: {
       skills: {
         include: {
