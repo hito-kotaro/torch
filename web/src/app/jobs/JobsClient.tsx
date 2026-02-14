@@ -47,6 +47,7 @@ export default function JobsClient({
   const [selectedJob, setSelectedJob] = useState<Job | null>(jobs[0] || null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const jobListRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userRole === "admin";
@@ -65,7 +66,12 @@ export default function JobsClient({
     }
   }, [currentPage]);
 
+  useEffect(() => {
+    setIsLoading(false);
+  }, [currentPage, jobs]);
+
   const applyParams = (next: Partial<JobsFilterParams>) => {
+    setIsLoading(true);
     const filterKeys = [
       "q",
       "id",
@@ -130,9 +136,6 @@ export default function JobsClient({
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-bold text-gray-900">
                     案件一覧
-                    <span className="text-sm font-normal text-gray-500 ml-2">
-                      （直近20日分）
-                    </span>
                   </h2>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">
@@ -184,8 +187,17 @@ export default function JobsClient({
               </div>
               <div
                 ref={jobListRef}
-                className="flex-1 overflow-y-auto p-6 pt-4 space-y-3"
+                className="flex-1 overflow-y-auto p-6 pt-4 space-y-3 min-h-[200px] flex flex-col"
               >
+                {isLoading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div
+                      className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"
+                      aria-label="読み込み中"
+                    />
+                  </div>
+                ) : (
+                  <>
                 {jobs.map((job) => (
                   <div
                     key={job.id}
@@ -227,6 +239,8 @@ export default function JobsClient({
                     </div>
                   </div>
                 ))}
+                  </>
+                )}
               </div>
               {totalPages > 1 && (
                 <div className="bg-white border-t border-gray-200 p-4 flex items-center justify-center gap-2">

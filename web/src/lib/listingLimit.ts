@@ -59,14 +59,15 @@ export function parseJobsSearchParams(
   };
 }
 
-/** JobsFilterParams から Prisma の where を組み立て */
+/** JobsFilterParams から Prisma の where を組み立て（listingSince 省略時は日付制限なし） */
 export function buildJobsWhere(
   filter: JobsFilterParams,
-  listingSince: Date
+  listingSince?: Date
 ): Prisma.JobWhereInput {
-  const conditions: Prisma.JobWhereInput[] = [
-    { receivedAt: { gte: listingSince } },
-  ];
+  const conditions: Prisma.JobWhereInput[] = [];
+  if (listingSince != null) {
+    conditions.push({ receivedAt: { gte: listingSince } });
+  }
 
   if (filter.id) {
     conditions.push({ id: { contains: filter.id, mode: 'insensitive' } });
@@ -116,6 +117,7 @@ export function buildJobsWhere(
     conditions.push({ receivedAt });
   }
 
+  if (conditions.length === 0) return {};
   return conditions.length === 1 ? conditions[0] : { AND: conditions };
 }
 

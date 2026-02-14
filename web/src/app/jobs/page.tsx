@@ -1,7 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getUserRole } from '@/lib/auth';
 import {
-  getListingSince,
   ITEMS_PER_PAGE,
   parseJobsSearchParams,
   buildJobsWhere,
@@ -16,8 +15,7 @@ async function getJobsPage(
   filter: ReturnType<typeof parseJobsSearchParams>,
   isAdmin: boolean
 ) {
-  const listingSince = getListingSince();
-  const where = buildJobsWhere(filter, listingSince);
+  const where = buildJobsWhere(filter);
 
   const [jobs, totalCount] = await Promise.all([
     prisma.job.findMany({
