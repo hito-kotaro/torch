@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 type SearchBarProps = {
+  initialQuery?: string;
+  initialId?: string;
+  initialGrades?: string[];
+  initialSkills?: string[];
+  initialMinPrice?: number | null;
+  initialMaxPrice?: number | null;
+  initialStartDate?: string | null;
+  initialEndDate?: string | null;
   onSearch: (query: string) => void;
   onGradeFilter: (grades: string[]) => void;
   onIdSearch: (id: string) => void;
@@ -33,6 +41,14 @@ const availableSkills = [
 ];
 
 export default function SearchBar({
+  initialQuery = "",
+  initialId = "",
+  initialGrades = [],
+  initialSkills = [],
+  initialMinPrice = null,
+  initialMaxPrice = null,
+  initialStartDate = null,
+  initialEndDate = null,
   onSearch,
   onGradeFilter,
   onIdSearch,
@@ -40,28 +56,57 @@ export default function SearchBar({
   onDateRangeFilter,
   onSkillFilter,
 }: SearchBarProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [idQuery, setIdQuery] = useState("");
-  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [minUnitPrice, setMinUnitPrice] = useState<string>("");
-  const [maxUnitPrice, setMaxUnitPrice] = useState<string>("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState(initialQuery);
+  const [idQuery, setIdQuery] = useState(initialId);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>(initialGrades);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(initialSkills);
+  const [minUnitPrice, setMinUnitPrice] = useState<string>(
+    initialMinPrice != null ? String(initialMinPrice) : ""
+  );
+  const [maxUnitPrice, setMaxUnitPrice] = useState<string>(
+    initialMaxPrice != null ? String(initialMaxPrice) : ""
+  );
+  const [startDate, setStartDate] = useState<string>(initialStartDate ?? "");
+  const [endDate, setEndDate] = useState<string>(initialEndDate ?? "");
   const [dateError, setDateError] = useState<string>("");
   const [unitPriceError, setUnitPriceError] = useState<string>("");
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
 
+  useEffect(() => {
+    setSearchQuery(initialQuery);
+    setIdQuery(initialId);
+    setSelectedGrades(initialGrades);
+    setSelectedSkills(initialSkills);
+    setMinUnitPrice(initialMinPrice != null ? String(initialMinPrice) : "");
+    setMaxUnitPrice(initialMaxPrice != null ? String(initialMaxPrice) : "");
+    setStartDate(initialStartDate ?? "");
+    setEndDate(initialEndDate ?? "");
+  }, [
+    initialQuery,
+    initialId,
+    initialGrades,
+    initialSkills,
+    initialMinPrice,
+    initialMaxPrice,
+    initialStartDate,
+    initialEndDate,
+  ]);
+
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const idDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-    onSearch(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => onSearch(value), 400);
   };
 
   const handleIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setIdQuery(value);
-    onIdSearch(value);
+    if (idDebounceRef.current) clearTimeout(idDebounceRef.current);
+    idDebounceRef.current = setTimeout(() => onIdSearch(value), 400);
   };
 
   const toggleGrade = (grade: string) => {
