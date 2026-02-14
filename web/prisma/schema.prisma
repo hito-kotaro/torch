@@ -101,6 +101,20 @@ model Talent {
   @@index([unitPrice])
 }
 
+// 案件分析の集計スナップショット（期間ごとに1行、バッチで更新）
+model JobAnalyticsSnapshot {
+  id            String   @id @default(cuid())
+  period        String   @unique // 7d | 30d | 90d | all
+  aggregatedAt  DateTime // 集計実行日時
+  totalCount    Int      // 総案件数
+  dailyStats    Json     // 日別件数 [["2025/1/1", 10], ...]
+  skillStats    Json     // スキル別 Top20 [["React", 50], ...]
+  positionStats Json     // ポジション別 [["SE", 30], ...]
+  priceStats    Json?    // 単価分布（管理者用） [["40万円未満", 5], ...]
+
+  @@index([period])
+}
+
 // 人材とスキルの中間テーブル
 model TalentSkill {
   id        String @id @default(cuid())

@@ -1,49 +1,39 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import AnalyticsClient from './AnalyticsClient';
 import { getUserRole } from '@/lib/auth';
-import { getListingSince } from '@/lib/listingLimit';
 
-const prisma = new PrismaClient();
+const VALID_PERIODS = ['7d', '30d', '90d', 'all'] as const;
+type Period = (typeof VALID_PERIODS)[number];
 
-export default async function AnalyticsPage() {
+function parsePeriod(v: string | string[] | undefined): Period {
+  const p = Array.isArray(v) ? v[0] : v;
+  if (p && VALID_PERIODS.includes(p as Period)) return p as Period;
+  return '30d';
+}
+
+type PageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export default async function AnalyticsPage({ searchParams }: PageProps) {
   const { userId } = await auth();
+  if (!userId) redirect('/sign-in');
 
-  if (!userId) {
-    redirect('/sign-in');
-  }
-
+  const params = await searchParams;
+  const period = parsePeriod(params?.period);
   const userRole = await getUserRole();
 
-  // 案件情報を取得（直近20日分）
-  const jobs = await prisma.job.findMany({
-    where: {
-      receivedAt: { gte: getListingSince() },
-    },
-    include: {
-      skills: {
-        include: {
-          skill: true,
-        },
-      },
-    },
-    orderBy: {
-      receivedAt: 'desc',
-    },
+  const snapshot = await prisma.jobAnalyticsSnapshot.findUnique({
+    where: { period },
   });
 
-  // クライアントコンポーネントに渡す形式に変換
-  const jobsForClient = jobs.map((job) => ({
-    id: job.id,
-    title: job.title,
-    company: job.company,
-    location: job.location,
-    grade: job.grade,
-    unitPrice: job.unitPrice,
-    receivedAt: job.receivedAt,
-    skills: job.skills.map((js) => js.skill.name),
-  }));
-
-  return <AnalyticsClient jobs={jobsForClient} userRole={userRole} />;
+  return (
+    <AnalyticsClient
+      period={period}
+      snapshot={snapshot}
+      userRole={userRole}
+    />
+  );
 }
