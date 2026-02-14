@@ -468,7 +468,7 @@ function processJobMail(message, thread) {
 }
 
 /**
- * Talentメールを処理（Gemini APIを使わず、原文のみTorch APIに送信）
+ * Talentメールを処理（タレント機能は無効のためAPI送信せず、ラベル付け・既読のみ）
  * @param {GmailMessage} message - Gmailメッセージオブジェクト
  * @param {GmailThread} thread - Gmailスレッドオブジェクト（ラベル付け用）
  * @returns {string} 'success' | 'error'
@@ -483,29 +483,11 @@ function processTalentMail(message, thread) {
       return "error";
     }
 
-    const from = message.getFrom();
     const subject = message.getSubject();
-    const mailDate = message.getDate();
+    console.log(`Talentメール処理開始（ラベルのみ）: ${subject}`);
 
-    console.log(`Talentメール処理開始: ${subject}`);
-
-    // Torch APIに原文のみ送信
-    const torchApiResult = sendToTorchTalentAPI({
-      originalTitle: subject,
-      originalBody: mailBody,
-      senderEmail: from,
-      receivedAt: mailDate.toISOString(),
-    });
-
-    if (torchApiResult.success) {
-      console.log(
-        `人材情報を保存しました: ${subject} (ID: ${torchApiResult.talentId})`
-      );
-      return "success";
-    } else {
-      console.error(`API送信エラー: ${torchApiResult.error}`);
-      return "error";
-    }
+    // タレント機能は無効のためAPI送信は行わず、呼び出し元でラベル・既読・処理済みマークのみ行う
+    return "success";
   } catch (e) {
     console.error(
       `メール(ID: ${message.getId()})の処理中にエラー: ${e.toString()}`
@@ -736,43 +718,6 @@ function sendToTorchAPI(jobData) {
     }
   } catch (e) {
     console.error("Torch API呼び出しエラー: " + e.toString());
-    return { success: false, error: e.toString() };
-  }
-}
-
-/**
- * Torch APIに人材情報を送信（原文のみ）
- */
-function sendToTorchTalentAPI(talentData) {
-  const url = `${TORCH_API_URL_CONFIG}/api/talents/import`;
-
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    headers: {
-      "X-API-Key": TORCH_API_KEY_CONFIG,
-    },
-    payload: JSON.stringify(talentData),
-    muteHttpExceptions: true,
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(url, options);
-    const responseCode = response.getResponseCode();
-    const responseBody = response.getContentText();
-
-    if (responseCode === 200) {
-      return JSON.parse(responseBody);
-    } else {
-      console.error(
-        `Torch Talent APIエラー (${responseCode}): ${responseBody}`
-      );
-      console.error(`リクエストURL: ${url}`);
-      console.error(`リクエストペイロード: ${JSON.stringify(talentData)}`);
-      return { success: false, error: `API returned ${responseCode}` };
-    }
-  } catch (e) {
-    console.error("Torch Talent API呼び出しエラー: " + e.toString());
     return { success: false, error: e.toString() };
   }
 }
