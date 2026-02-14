@@ -5,6 +5,7 @@ import {
   getCutoffDate,
   type JobForAnalytics,
 } from '@/lib/analyticsAggregate';
+import { getJobRetentionCutoff } from '@/lib/jobRetention';
 
 const PERIODS = ['7d', '30d', '90d', 'all'] as const;
 
@@ -64,9 +65,16 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // 保持期間を過ぎた案件を削除（分析はスナップショットで保持済み）
+    const retentionCutoff = getJobRetentionCutoff();
+    const deleteResult = await prisma.job.deleteMany({
+      where: { receivedAt: { lt: retentionCutoff } },
+    });
+
     return NextResponse.json({
       success: true,
       message: 'Analytics snapshots updated',
+      deletedJobs: deleteResult.count,
     });
   } catch (error) {
     console.error('Analytics cron error:', error);
