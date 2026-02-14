@@ -23,6 +23,8 @@ type Job = {
   originalBody: string | null;
   senderEmail: string | null;
   receivedAt: Date;
+  receivedAtDisplay: string;
+  receivedAtDisplayLong: string;
   skills: string[];
 };
 
@@ -213,7 +215,7 @@ export default function JobsClient({
                         {job.title}
                       </h3>
                       <span className="text-xs text-gray-400 ml-2">
-                        {new Date(job.receivedAt).toLocaleDateString("ja-JP")}
+                        {job.receivedAtDisplay}
                       </span>
                     </div>
                     {isAdmin && job.company && (
@@ -293,11 +295,7 @@ export default function JobsClient({
                       ID: {selectedJob.id}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
-                      着信日:{" "}
-                      {new Date(selectedJob.receivedAt).toLocaleDateString(
-                        "ja-JP",
-                        { year: "numeric", month: "long", day: "numeric" }
-                      )}
+                      着信日: {selectedJob.receivedAtDisplayLong}
                     </p>
                     {isAdmin && selectedJob.unitPrice && (
                       <p className="text-lg font-semibold text-green-600 mt-2">

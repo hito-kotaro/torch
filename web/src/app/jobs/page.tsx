@@ -32,6 +32,19 @@ async function getJobsPage(
     prisma.job.count({ where }),
   ]);
 
+  const dateFmt = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const dateFmtLong = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   return {
     jobs: jobs.map((job) => ({
       id: job.id,
@@ -46,6 +59,8 @@ async function getJobsPage(
       originalBody: isAdmin ? job.originalBody : null,
       senderEmail: isAdmin ? job.senderEmail : null,
       receivedAt: job.receivedAt,
+      receivedAtDisplay: dateFmt.format(job.receivedAt),
+      receivedAtDisplayLong: dateFmtLong.format(job.receivedAt),
       skills: job.skills.map((js) => js.skill.name),
     })),
     totalCount,
