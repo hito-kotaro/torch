@@ -1,51 +1,75 @@
 import { prisma } from '@/lib/prisma';
 import { getUserRole } from '@/lib/auth';
+import {
+  ITEMS_PER_PAGE,
+  parseJobsSearchParams,
+  buildJobsWhere,
+} from '@/lib/listingLimit';
 import JobsClient from './JobsClient';
 
-async function getJobs(isAdmin: boolean) {
-  const jobs = await prisma.job.findMany({
-    include: {
-      skills: {
-        include: {
-          skill: true,
+type PageProps = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+async function getJobsPage(
+  filter: ReturnType<typeof parseJobsSearchParams>,
+  isAdmin: boolean
+) {
+  const where = buildJobsWhere(filter);
+
+  const [jobs, totalCount] = await Promise.all([
+    prisma.job.findMany({
+      where,
+      include: {
+        skills: {
+          include: { skill: true },
         },
       },
-    },
-    orderBy: {
-      receivedAt: 'desc',
-    },
-  });
+      orderBy: { receivedAt: filter.sort },
+      skip: (filter.page - 1) * ITEMS_PER_PAGE,
+      take: ITEMS_PER_PAGE,
+    }),
+    prisma.job.count({ where }),
+  ]);
 
-  return jobs.map((job) => ({
-    id: job.id,
-    title: job.title,
-    company: job.company,
-    location: job.location,
-    grade: job.grade,
-    unitPrice: job.unitPrice, // フィルタリング用に全ユーザーに返す（表示は管理者のみ）
-    summary: job.summary,
-    description: job.description,
-    originalTitle: isAdmin ? job.originalTitle : null, // 管理者のみ原文タイトルを返す
-    originalBody: isAdmin ? job.originalBody : null, // 管理者のみ原文本文を返す
-    senderEmail: isAdmin ? job.senderEmail : null, // 管理者のみ送信者メールを返す
-    receivedAt: job.receivedAt,
-    skills: job.skills.map((js) => js.skill.name),
-  }));
+  return {
+    jobs: jobs.map((job) => ({
+      id: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      grade: job.grade,
+      unitPrice: job.unitPrice,
+      summary: job.summary,
+      description: job.description,
+      originalTitle: isAdmin ? job.originalTitle : null,
+      originalBody: isAdmin ? job.originalBody : null,
+      senderEmail: isAdmin ? job.senderEmail : null,
+      receivedAt: job.receivedAt,
+      skills: job.skills.map((js) => js.skill.name),
+    })),
+    totalCount,
+    totalPages: Math.ceil(totalCount / ITEMS_PER_PAGE),
+    currentPage: filter.page,
+    filter,
+  };
 }
 
-async function getAllSkills() {
-  const skills = await prisma.skill.findMany({
-    orderBy: {
-      name: 'asc',
-    },
-  });
-  return skills.map((skill) => skill.name);
-}
-
-export default async function JobsPage() {
+export default async function JobsPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const filter = parseJobsSearchParams(params ?? {});
   const userRole = await getUserRole();
   const isAdmin = userRole === 'admin';
-  const jobs = await getJobs(isAdmin);
+  const data = await getJobsPage(filter, isAdmin);
 
-  return <JobsClient jobs={jobs} userRole={userRole} />;
+  return (
+    <JobsClient
+      jobs={data.jobs}
+      totalCount={data.totalCount}
+      totalPages={data.totalPages}
+      currentPage={data.currentPage}
+      filter={data.filter}
+      userRole={userRole}
+    />
+  );
 }

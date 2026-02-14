@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import SplitLayout from "@/components/SplitLayout";
 import SearchBar from "@/components/SearchBar";
 import JobDetailModal from "@/components/JobDetailModal";
+import type { JobsFilterParams } from "@/lib/listingLimit";
+import { buildJobsQueryString } from "@/lib/listingLimit";
 
 type Job = {
   id: string;
@@ -25,173 +28,95 @@ type Job = {
 
 type JobsClientProps = {
   jobs: Job[];
+  totalCount: number;
+  totalPages: number;
+  currentPage: number;
+  filter: JobsFilterParams;
   userRole: "admin" | "general";
 };
 
-export default function JobsClient({ jobs, userRole }: JobsClientProps) {
+export default function JobsClient({
+  jobs,
+  totalCount,
+  totalPages,
+  currentPage,
+  filter,
+  userRole,
+}: JobsClientProps) {
+  const router = useRouter();
   const [selectedJob, setSelectedJob] = useState<Job | null>(jobs[0] || null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [idQuery, setIdQuery] = useState("");
-  const [gradeFilters, setGradeFilters] = useState<string[]>([]);
-  const [skillFilters, setSkillFilters] = useState<string[]>([]);
-  const [minUnitPrice, setMinUnitPrice] = useState<number | null>(null);
-  const [maxUnitPrice, setMaxUnitPrice] = useState<number | null>(null);
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState<string | null>(null);
-  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // 新しい順がデフォルト
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isModalOpen, setIsModalOpen] = useState(false); // モーダル表示状態
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // サイドバー開閉状態
-  const ITEMS_PER_PAGE = 50;
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const jobListRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = userRole === "admin";
 
-  // ページ変更時にスクロールを一番上に戻す
+  useEffect(() => {
+    setSelectedJob((prev) => {
+      if (jobs.length === 0) return null;
+      const stillInList = prev && jobs.some((j) => j.id === prev.id);
+      return stillInList ? prev : jobs[0];
+    });
+  }, [jobs]);
+
   useEffect(() => {
     if (jobListRef.current) {
       jobListRef.current.scrollTop = 0;
     }
   }, [currentPage]);
 
-  // 案件選択ハンドラ（モバイル対応）
-  const handleJobSelect = (job: Job) => {
-    setSelectedJob(job);
-    // モバイルではモーダルを開く
-    if (window.innerWidth < 768) {
-      setIsModalOpen(true);
-    }
+  useEffect(() => {
+    setIsLoading(false);
+  }, [currentPage, jobs]);
+
+  const applyParams = (next: Partial<JobsFilterParams>) => {
+    setIsLoading(true);
+    const filterKeys = [
+      "q",
+      "id",
+      "grades",
+      "skills",
+      "minPrice",
+      "maxPrice",
+      "startDate",
+      "endDate",
+      "sort",
+    ];
+    const isFilterChange = Object.keys(next).some((k) =>
+      filterKeys.includes(k)
+    );
+    const merged: JobsFilterParams = {
+      ...filter,
+      ...next,
+      page:
+        next.page !== undefined
+          ? next.page
+          : isFilterChange
+            ? 1
+            : filter.page,
+    };
+    const qs = buildJobsQueryString(merged);
+    router.push(qs ? `/jobs?${qs}` : "/jobs");
   };
 
-  const filteredAndSortedJobs = useMemo(() => {
-    const result = jobs.filter((job) => {
-      // ID検索が入力されている場合は、IDのみで検索
-      if (idQuery !== "") {
-        return job.id.toLowerCase().includes(idQuery.toLowerCase());
-      }
+  const applyPage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    applyParams({ page });
+  };
 
-      const matchesSearch =
-        searchQuery === "" ||
-        job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.summary?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesGrade =
-        gradeFilters.length === 0 ||
-        (job.grade && gradeFilters.includes(job.grade));
-
-      // 単価フィルター（unitPriceが存在する場合のみ）
-      // データベースのunitPriceは万円単位で保存されている想定
-      // unitPriceがnullの場合はフィルター対象外（表示される）
-      // フィルターが設定されている場合のみ、unitPriceがnullの案件を除外
-      let matchesUnitPrice = true;
-      if (minUnitPrice !== null || maxUnitPrice !== null) {
-        // フィルターが設定されている場合
-        if (job.unitPrice === null) {
-          // unitPriceがnullの案件は除外
-          matchesUnitPrice = false;
-        } else {
-          // unitPriceが存在する場合、範囲チェック
-          matchesUnitPrice =
-            (minUnitPrice === null || job.unitPrice >= minUnitPrice) &&
-            (maxUnitPrice === null || job.unitPrice <= maxUnitPrice);
-        }
-      }
-
-      // スキルフィルター
-      const matchesSkill =
-        skillFilters.length === 0 ||
-        skillFilters.some((skill) =>
-          job.skills.some(
-            (jobSkill) => jobSkill.toLowerCase() === skill.toLowerCase()
-          )
-        );
-
-      // 着信日フィルター
-      let matchesDate = true;
-      if (startDate !== null || endDate !== null) {
-        const jobDate = new Date(job.receivedAt);
-        jobDate.setHours(0, 0, 0, 0); // 時刻を0時にリセット
-
-        if (startDate !== null && endDate !== null) {
-          // 両方指定されている場合
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999); // 終了日の23:59:59まで
-          matchesDate = jobDate >= start && jobDate <= end;
-        } else if (startDate !== null) {
-          // 開始日のみ指定
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          matchesDate = jobDate >= start;
-        } else if (endDate !== null) {
-          // 終了日のみ指定
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          matchesDate = jobDate <= end;
-        }
-      }
-
-      return (
-        matchesSearch &&
-        matchesGrade &&
-        matchesSkill &&
-        matchesUnitPrice &&
-        matchesDate
-      );
-    });
-
-    // ソート処理
-    result.sort((a, b) => {
-      const dateA = new Date(a.receivedAt).getTime();
-      const dateB = new Date(b.receivedAt).getTime();
-      return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
-    });
-
-    return result;
-  }, [
-    jobs,
-    searchQuery,
-    idQuery,
-    gradeFilters,
-    skillFilters,
-    minUnitPrice,
-    maxUnitPrice,
-    startDate,
-    endDate,
-    sortOrder,
-  ]);
-
-  // ページネーション
-  const totalPages = Math.ceil(filteredAndSortedJobs.length / ITEMS_PER_PAGE);
-  const paginatedJobs = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredAndSortedJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredAndSortedJobs, currentPage]);
-
-  // ID検索で1件に絞り込まれた場合、自動的にその案件を選択
-  useEffect(() => {
-    if (idQuery !== "" && filteredAndSortedJobs.length === 1) {
-      setSelectedJob(filteredAndSortedJobs[0]);
-    }
-  }, [idQuery, filteredAndSortedJobs]);
-
-  // フィルタ変更時にページを1にリセット
-  const handleFilterChange = () => {
-    setCurrentPage(1);
+  const handleJobSelect = (job: Job) => {
+    setSelectedJob(job);
+    if (window.innerWidth < 768) setIsModalOpen(true);
   };
 
   return (
     <div className="h-screen flex flex-col">
       <Header onMenuClick={() => setIsSidebarOpen(true)} />
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebarはデスクトップのみ表示 */}
         <div className="hidden md:block">
           <Sidebar isAdmin={isAdmin} />
         </div>
-
-        {/* モバイル用サイドバー（オーバーレイ） */}
         {isSidebarOpen && (
           <div className="fixed inset-0 z-50 md:hidden">
             <div
@@ -209,15 +134,20 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
             <div className="flex flex-col h-full">
               <div className="sticky top-0 bg-white z-10 p-6 pb-4 border-b border-gray-200">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold text-gray-900">案件一覧</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    案件一覧
+                  </h2>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-600">
-                      {filteredAndSortedJobs.length}件
+                      {totalCount}件
                     </span>
                     <select
-                      value={sortOrder}
+                      value={filter.sort}
                       onChange={(e) =>
-                        setSortOrder(e.target.value as "desc" | "asc")
+                        applyParams({
+                          sort: e.target.value as "desc" | "asc",
+                          page: 1,
+                        })
                       }
                       className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
@@ -227,39 +157,48 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                   </div>
                 </div>
                 <SearchBar
-                  onSearch={(query) => {
-                    setSearchQuery(query);
-                    handleFilterChange();
-                  }}
-                  onGradeFilter={(grades) => {
-                    setGradeFilters(grades);
-                    handleFilterChange();
-                  }}
-                  onIdSearch={(id) => {
-                    setIdQuery(id);
-                    handleFilterChange();
-                  }}
-                  onSkillFilter={(skills) => {
-                    setSkillFilters(skills);
-                    handleFilterChange();
-                  }}
-                  onUnitPriceFilter={(min, max) => {
-                    setMinUnitPrice(min);
-                    setMaxUnitPrice(max);
-                    handleFilterChange();
-                  }}
-                  onDateRangeFilter={(start, end) => {
-                    setStartDate(start);
-                    setEndDate(end);
-                    handleFilterChange();
-                  }}
+                  initialQuery={filter.q}
+                  initialId={filter.id}
+                  initialGrades={filter.grades}
+                  initialSkills={filter.skills}
+                  initialMinPrice={filter.minPrice}
+                  initialMaxPrice={filter.maxPrice}
+                  initialStartDate={filter.startDate}
+                  initialEndDate={filter.endDate}
+                  onSearch={(q) => applyParams({ q, page: 1 })}
+                  onGradeFilter={(grades) => applyParams({ grades, page: 1 })}
+                  onIdSearch={(id) => applyParams({ id, page: 1 })}
+                  onSkillFilter={(skills) => applyParams({ skills, page: 1 })}
+                  onUnitPriceFilter={(min, max) =>
+                    applyParams({
+                      minPrice: min,
+                      maxPrice: max,
+                      page: 1,
+                    })
+                  }
+                  onDateRangeFilter={(start, end) =>
+                    applyParams({
+                      startDate: start,
+                      endDate: end,
+                      page: 1,
+                    })
+                  }
                 />
               </div>
               <div
                 ref={jobListRef}
-                className="flex-1 overflow-y-auto p-6 pt-4 space-y-3"
+                className="flex-1 overflow-y-auto p-6 pt-4 space-y-3 min-h-[200px] flex flex-col"
               >
-                {paginatedJobs.map((job) => (
+                {isLoading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div
+                      className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"
+                      aria-label="読み込み中"
+                    />
+                  </div>
+                ) : (
+                  <>
+                {jobs.map((job) => (
                   <div
                     key={job.id}
                     onClick={() => handleJobSelect(job)}
@@ -300,11 +239,13 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     </div>
                   </div>
                 ))}
+                  </>
+                )}
               </div>
               {totalPages > 1 && (
                 <div className="bg-white border-t border-gray-200 p-4 flex items-center justify-center gap-2">
                   <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    onClick={() => applyPage(currentPage - 1)}
                     disabled={currentPage === 1}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                   >
@@ -314,9 +255,7 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                     {currentPage} / {totalPages} ページ
                   </span>
                   <button
-                    onClick={() =>
-                      setCurrentPage(Math.min(totalPages, currentPage + 1))
-                    }
+                    onClick={() => applyPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                   >
@@ -342,7 +281,9 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
                         {selectedJob.company}
                       </p>
                     )}
-                    <p className="text-gray-500 mt-1">{selectedJob.location}</p>
+                    <p className="text-gray-500 mt-1">
+                      {selectedJob.location}
+                    </p>
                     {selectedJob.grade && (
                       <p className="text-sm text-gray-600 mt-1">
                         ポジション: {selectedJob.grade}
@@ -437,7 +378,6 @@ export default function JobsClient({ jobs, userRole }: JobsClientProps) {
         />
       </div>
 
-      {/* モバイル用モーダル */}
       {isModalOpen && selectedJob && (
         <JobDetailModal
           job={selectedJob}
