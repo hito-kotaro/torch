@@ -15,6 +15,8 @@ type Job = {
   originalBody: string | null;
   senderEmail: string | null;
   receivedAt: Date;
+  /** 着信日表示用（Asia/Tokyo でフォーマット済み）。渡されていればこちらを表示 */
+  receivedAtDisplayLong?: string;
   skills: string[];
 };
 
@@ -84,7 +86,7 @@ export default function JobDetailModal({
               )}
               <p className="text-xs text-gray-400 mt-1">ID: {job.id}</p>
               <p className="text-xs text-gray-400 mt-1">
-                着信日: {new Date(job.receivedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                着信日: {job.receivedAtDisplayLong ?? new Date(job.receivedAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
               </p>
               {isAdmin && job.unitPrice && (
                 <p className="text-lg font-semibold text-green-600 mt-2">
